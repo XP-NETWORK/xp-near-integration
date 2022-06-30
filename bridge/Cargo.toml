@@ -8,3 +8,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 near-sdk = "4.0.0"
+
+[dev-dependencies]
+ed25519-dalek = { version = "1.0.1", features = ["std", "rand"] }
+rand_core = { version = "0.5.1", features = ["getrandom"] }
