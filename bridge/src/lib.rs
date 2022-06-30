@@ -1,9 +1,8 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{env, log, metadata, near_bindgen, AccountId};
+use near_sdk::near_bindgen;
 
 use std::collections::HashMap;
 
-metadata! {
 #[near_bindgen]
 #[derive(Default, BorshDeserialize, BorshSerialize)]
 pub struct XpBridge {
@@ -66,21 +65,5 @@ impl XpBridge {
     #[payable]
     pub fn validate_unfreeze_nft(&mut self) {
         // TODO:
-    }
-}
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use near_sdk::test_utils::{get_logs, VMContextBuilder};
-    use near_sdk::{testing_env, VMContext};
-
-    fn get_context(is_view: bool) -> VMContext {
-        VMContextBuilder::new()
-            .signer_account_id("bob_near".parse().unwrap())
-            .is_view(is_view)
-            .build()
     }
 }
