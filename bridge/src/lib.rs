@@ -1,7 +1,21 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{near_bindgen, AccountId};
+use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::{near_bindgen, log, require};
+use ed25519_compact::{PublicKey, Signature};
 
 use std::collections::HashMap;
+
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct PauseData {
+    action_id: u128,
+}
+
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct UnpauseData {
+    action_id: u128,
+}
 
 #[near_bindgen]
 #[derive(Default, BorshDeserialize, BorshSerialize)]
@@ -26,61 +40,89 @@ impl XpBridge {
         }
     }
 
+    #[private]
+    fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>) {
+        let f = self.consumed_actions.contains_key(&action_id);
+        require!(!f, "Duplicated Action");
+
+        self.consumed_actions.insert(action_id, true);
+
+        let sig = Signature::new(sig_data.as_slice().try_into().unwrap());
+        let key = PublicKey::new(self.group_key);
+        let res = key.verify(data, &sig);
+        require!(res.is_ok(), "Unauthorized Action");
+    }
+
     #[payable]
-    pub fn validate_pause(&mut self) {
-        // TODO:
+    pub fn validate_pause(&mut self, data: PauseData, sig_data: Vec<u8>) {
+        require!(!self.paused, "paused");
+
+        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+
         self.paused = true;
     }
 
     #[payable]
-    pub fn validate_unpause(&mut self) {
-        // TODO:
+    pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Vec<u8>) {
+        require!(self.paused, "unpaused");
+
+        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+
         self.paused = false;
     }
 
     #[payable]
     pub fn validate_withdraw_fees(&mut self) {
+        require!(!self.paused, "paused");
         // TODO:
     }
 
     #[payable]
     pub fn validate_update_group_key(&mut self, group_key: [u8; 32]) {
+        require!(!self.paused, "paused");
         // TODO:
         self.group_key = group_key;
     }
 
     #[payable]
     pub fn validate_transfer_nft(&mut self) {
+        require!(!self.paused, "paused");
         // TODO:
     }
 
     #[payable]
     pub fn withdraw_nft(&mut self) {
+        require!(!self.paused, "paused");
         // TODO:
     }
 
     #[payable]
     pub fn freeze_nft(&mut self) {
+        require!(!self.paused, "paused");
         // TODO:
     }
 
     #[payable]
     pub fn validate_unfreeze_nft(&mut self) {
+        require!(!self.paused, "paused");
         // TODO:
     }
 
     pub fn get_group_key(&self) -> [u8; 32] {
         self.group_key
     }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused
+    }
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
-    use ed25519_dalek::Keypair;
+    use ed25519_dalek::{ExpandedSecretKey, Keypair};
     use near_sdk::test_utils::VMContextBuilder;
     use near_sdk::{testing_env, VMContext};
     use rand_core::OsRng;
-    use std::collections::HashMap;
 
     use super::*;
 
@@ -91,8 +133,12 @@ mod tests {
             .build()
     }
 
+    fn init_func(group_key: [u8; 32]) -> XpBridge {
+        XpBridge::new(group_key)
+    }
+
     #[test]
-    fn test_bridge() {
+    fn test_init() {
         let context = get_context(false);
         testing_env!(context);
 
@@ -100,11 +146,45 @@ mod tests {
         let kp = Keypair::generate(&mut csprng);
         let group_key: [u8; 32] = kp.public.to_bytes();
 
-        let contract = XpBridge::new(group_key);
+        let contract = init_func(group_key);
 
         let context = get_context(true);
         testing_env!(context);
 
         assert_eq!(group_key, contract.get_group_key());
+    }
+
+    #[test]
+    fn test_pause_unpause() {
+        let context = get_context(false);
+        testing_env!(context);
+
+        let mut csprng = OsRng {};
+        let kp = Keypair::generate(&mut csprng);
+        let group_key: [u8; 32] = kp.public.to_bytes();
+
+        let mut contract = init_func(group_key);
+
+        let data = PauseData { action_id: 1 };
+        let secret: ExpandedSecretKey = (&kp.secret).into();
+        let sig = secret.sign(&(data.try_to_vec().unwrap()), &kp.public);
+
+        contract.validate_pause(data, sig.to_bytes().to_vec());
+
+        let context = get_context(true);
+        testing_env!(context);
+
+        assert_eq!(true, contract.is_paused());
+
+        let data = UnpauseData { action_id: 2 };
+        let secret: ExpandedSecretKey = (&kp.secret).into();
+        let sig = secret.sign(&(data.try_to_vec().unwrap()), &kp.public);
+
+        contract.validate_unpause(data, sig.to_bytes().to_vec());
+
+        let context = get_context(true);
+        testing_env!(context);
+
+        assert_eq!(false, contract.is_paused());
     }
 }

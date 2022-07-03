@@ -5,10 +5,10 @@ use workspaces::prelude::*;
 #[test_case("xpnft")]
 #[tokio::test]
 async fn test_xp_bridge(contract_name: &str) -> anyhow::Result<()> {
-    let worker = workspaces::sandbox().await?;
-    let contract = worker
-        .dev_deploy(&std::fs::read(format!("res/{}.wasm", contract_name))?)
-        .await?;
+    // let worker = workspaces::sandbox().await?;
+    // let contract = worker
+    //     .dev_deploy(&std::fs::read(format!("res/{}.wasm", contract_name))?)
+    //     .await?;
 
     // let res = contract
     //     .call(&worker, "factorial")
