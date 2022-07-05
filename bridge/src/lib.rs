@@ -17,6 +17,13 @@ pub struct UnpauseData {
     action_id: u128,
 }
 
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct UpdateGroupkeyData {
+    action_id: u128,
+    group_key: [u8; 32],
+}
+
 #[near_bindgen]
 #[derive(Default, BorshDeserialize, BorshSerialize)]
 pub struct XpBridge {
@@ -78,10 +85,12 @@ impl XpBridge {
     }
 
     #[payable]
-    pub fn validate_update_group_key(&mut self, group_key: [u8; 32]) {
+    pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
-        // TODO:
-        self.group_key = group_key;
+        
+        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+
+        self.group_key = data.group_key;
     }
 
     #[payable]
@@ -186,5 +195,32 @@ mod tests {
         testing_env!(context);
 
         assert_eq!(false, contract.is_paused());
+    }
+
+    #[test]
+    fn test_update_group_key() {
+        let context = get_context(false);
+        testing_env!(context);
+
+        let mut csprng = OsRng {};
+        let kp = Keypair::generate(&mut csprng);
+        let group_key: [u8; 32] = kp.public.to_bytes();
+
+        let mut contract = init_func(group_key);
+
+        let mut new_csprng = OsRng {};
+        let new_kp = Keypair::generate(&mut new_csprng);
+        let new_group_key: [u8; 32] = new_kp.public.to_bytes();
+
+        let data = UpdateGroupkeyData { action_id: 3, group_key: new_group_key };
+        let secret: ExpandedSecretKey = (&kp.secret).into();
+        let sig = secret.sign(&(data.try_to_vec().unwrap()), &kp.public);
+
+        contract.validate_update_group_key(data, sig.to_bytes().to_vec());
+
+        let context = get_context(true);
+        testing_env!(context);
+
+        assert_eq!(new_group_key, contract.get_group_key());
     }
 }
