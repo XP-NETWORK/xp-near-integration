@@ -1,6 +1,6 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{near_bindgen, log, require};
+use near_sdk::{env, near_bindgen, Promise, log, require, PromiseOrValue, AccountId};
 use ed25519_compact::{PublicKey, Signature};
 
 use std::collections::HashMap;
@@ -22,6 +22,14 @@ pub struct UnpauseData {
 pub struct UpdateGroupkeyData {
     action_id: u128,
     group_key: [u8; 32],
+}
+
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct WithdrawFeeData {
+    pub action_id: u128,
+    pub account_id: String,
+    pub public_key: Vec<u8>,
 }
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -91,9 +99,21 @@ impl XpBridge {
     }
 
     #[payable]
-    pub fn validate_withdraw_fees(&mut self) {
+    pub fn validate_withdraw_fees(&mut self, data: WithdrawFeeData, sig_data: Vec<u8>) -> PromiseOrValue<()> {
         require!(!self.paused, "paused");
-        // TODO:
+
+        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+        
+        
+        let account_id: AccountId = data.account_id.parse().unwrap();
+        let public_key = near_sdk::PublicKey::try_from(data.public_key).unwrap();
+        // Creating new account. It still can fail (e.g. account already exists or name is invalid),
+        // but we don't care, we'll get a refund back.
+        Promise::new(account_id)
+            .create_account()
+            .transfer(env::account_balance() / 1000)
+            .add_full_access_key(public_key)
+            .into()
     }
 
     #[payable]
