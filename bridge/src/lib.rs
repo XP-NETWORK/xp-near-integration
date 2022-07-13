@@ -24,6 +24,18 @@ pub struct UpdateGroupkeyData {
     group_key: [u8; 32],
 }
 
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct TransferNftData {
+    action_id: u128,
+}
+
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct UnfreezeNftData {
+    action_id: u128,
+}
+
 #[near_bindgen]
 #[derive(Default, BorshDeserialize, BorshSerialize)]
 pub struct XpBridge {
@@ -94,8 +106,11 @@ impl XpBridge {
     }
 
     #[payable]
-    pub fn validate_transfer_nft(&mut self) {
+    pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
+
+        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+
         // TODO:
     }
 
@@ -112,8 +127,10 @@ impl XpBridge {
     }
 
     #[payable]
-    pub fn validate_unfreeze_nft(&mut self) {
+    pub fn validate_unfreeze_nft(&mut self, data: UnfreezeNftData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
+
+        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
         // TODO:
     }
 
