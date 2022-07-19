@@ -1,5 +1,15 @@
 # NEAR Integration with Xp.network Bridge
 
+## Build Sandbox
+
+```
+git clone https://github.com/near/nearcore
+cd nearcore
+make sandbox
+```
+
+update environment variables: `export NEAR_SANDBOX_BIN_PATH="/Users/rocalex/nearcore/sandbox/debug/neard"`
+
 ### Test the code
 
 ```
