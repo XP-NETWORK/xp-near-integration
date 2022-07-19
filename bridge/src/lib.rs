@@ -96,6 +96,9 @@ impl XpBridge {
         }
     }
 
+    /// Ed25519 Signature verification logic.
+    /// Signature check for bridge actions.
+    /// Consumes the passed action_id.
     #[private]
     fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>) {
         let f = self.consumed_actions.contains_key(&action_id);
@@ -157,6 +160,7 @@ impl XpBridge {
         self.group_key = data.group_key;
     }
 
+    /// Transfer foreign NFT. mint wrapped NFT
     #[payable]
     pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
@@ -166,6 +170,9 @@ impl XpBridge {
         ext_xp_nft::nft_mint(data.token_id, data.owner_id, data.token_metadata);
     }
 
+    /// Withdraw foreign NFT
+    /// WARN: Even though this contract doesn't check if the burner is trusted,
+    /// we check this in the bridge infrastructure(i.e in the validator)
     #[payable]
     pub fn withdraw_nft(&mut self, token_id: TokenId, chain_nonce: u8, to: String, amt: u128) {
         require!(!self.paused, "paused");
@@ -183,6 +190,7 @@ impl XpBridge {
         env::log_str(format!("yocto: {}", amt).as_str());
     }
 
+    /// Freeze NEP-171 token.
     #[payable]
     pub fn freeze_nft(
         &mut self,
@@ -208,6 +216,7 @@ impl XpBridge {
         env::log_str(format!("yocto: {}", amt).as_str());
     }
 
+    /// Unfreeze NEP-171 token.
     #[payable]
     pub fn validate_unfreeze_nft(&mut self, data: UnfreezeNftData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
