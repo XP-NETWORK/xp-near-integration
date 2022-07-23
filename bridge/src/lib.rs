@@ -63,7 +63,7 @@ pub struct TransferNftData {
     action_id: u128,
     token_id: TokenId,
     owner_id: AccountId,
-    token_metadata: TokenMetadata
+    token_metadata: TokenMetadata,
 }
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -167,7 +167,11 @@ impl XpBridge {
 
         self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
 
-        ext_xp_nft::nft_mint(data.token_id, data.owner_id, data.token_metadata);
+        ext_xp_nft::ext(env::current_account_id()).nft_mint(
+            data.token_id,
+            data.owner_id,
+            data.token_metadata,
+        );
     }
 
     /// Withdraw foreign NFT
@@ -177,7 +181,8 @@ impl XpBridge {
     pub fn withdraw_nft(&mut self, token_id: TokenId, chain_nonce: u8, to: String, amt: u128) {
         require!(!self.paused, "paused");
 
-        ext_xp_nft::nft_burn(token_id, env::signer_account_id());
+        ext_xp_nft::ext(env::current_account_id())
+            .nft_burn(token_id, env::predecessor_account_id());
 
         Promise::new(env::current_account_id()).transfer(amt);
 
@@ -202,7 +207,12 @@ impl XpBridge {
     ) {
         require!(!self.paused, "paused");
 
-        ext_nft::nft_transfer(env::current_account_id(), token_id, None, None);
+        ext_nft::ext(env::predecessor_account_id()).nft_transfer(
+            env::current_account_id(),
+            token_id,
+            None,
+            None,
+        );
 
         Promise::new(env::current_account_id()).transfer(amt);
 
@@ -222,8 +232,13 @@ impl XpBridge {
         require!(!self.paused, "paused");
 
         self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
-        
-        ext_nft::nft_transfer(env::signer_account_id(), data.token_id, None, None);
+
+        ext_nft::ext(env::current_account_id()).nft_transfer(
+            env::signer_account_id(),
+            data.token_id,
+            None,
+            None,
+        );
     }
 
     pub fn get_group_key(&self) -> [u8; 32] {
@@ -239,16 +254,18 @@ impl XpBridge {
 mod tests {
     use ed25519_dalek::{ExpandedSecretKey, Keypair};
     use near_sdk::test_utils::VMContextBuilder;
-    use near_sdk::{testing_env, VMContext};
+    use near_sdk::{testing_env, Balance};
     use rand_core::OsRng;
 
     use super::*;
 
-    fn get_context(is_view: bool) -> VMContext {
-        VMContextBuilder::new()
-            .signer_account_id("alice".parse().unwrap())
-            .is_view(is_view)
-            .build()
+    const NEAR: u128 = 1000000000000000000000000;
+
+    fn set_context(predecessor: &str, amount: Balance) {
+        let mut builder = VMContextBuilder::new();
+        builder.predecessor_account_id(predecessor.parse().unwrap());
+        builder.attached_deposit(amount);
+        testing_env!(builder.build());
     }
 
     fn init_func(group_key: [u8; 32]) -> XpBridge {
@@ -256,9 +273,8 @@ mod tests {
     }
 
     #[test]
-    fn test_init() {
-        let context = get_context(false);
-        testing_env!(context);
+    fn init() {
+        set_context("admin", 1 * NEAR);
 
         let mut csprng = OsRng {};
         let kp = Keypair::generate(&mut csprng);
@@ -266,16 +282,12 @@ mod tests {
 
         let contract = init_func(group_key);
 
-        let context = get_context(true);
-        testing_env!(context);
-
         assert_eq!(group_key, contract.get_group_key());
     }
 
     #[test]
-    fn test_pause_unpause() {
-        let context = get_context(false);
-        testing_env!(context);
+    fn pause_unpause() {
+        set_context("admin", 1 * NEAR);
 
         let mut csprng = OsRng {};
         let kp = Keypair::generate(&mut csprng);
@@ -289,9 +301,6 @@ mod tests {
 
         contract.validate_pause(data, sig.to_bytes().to_vec());
 
-        let context = get_context(true);
-        testing_env!(context);
-
         assert_eq!(true, contract.is_paused());
 
         let data = UnpauseData { action_id: 2 };
@@ -300,16 +309,12 @@ mod tests {
 
         contract.validate_unpause(data, sig.to_bytes().to_vec());
 
-        let context = get_context(true);
-        testing_env!(context);
-
         assert_eq!(false, contract.is_paused());
     }
 
     #[test]
-    fn test_update_group_key() {
-        let context = get_context(false);
-        testing_env!(context);
+    fn update_group_key() {
+        set_context("admin", 1 * NEAR);
 
         let mut csprng = OsRng {};
         let kp = Keypair::generate(&mut csprng);
@@ -330,9 +335,76 @@ mod tests {
 
         contract.validate_update_group_key(data, sig.to_bytes().to_vec());
 
-        let context = get_context(true);
-        testing_env!(context);
-
         assert_eq!(new_group_key, contract.get_group_key());
+    }
+
+    #[test]
+    fn freeze_unfreeze_nft() {
+        set_context("sender", 2 * NEAR);
+
+        let mut csprng = OsRng {};
+        let kp = Keypair::generate(&mut csprng);
+        let group_key: [u8; 32] = kp.public.to_bytes();
+
+        let mut contract = init_func(group_key);
+
+        contract.freeze_nft(
+            "test_nft".to_string(),
+            0x0,
+            "address_of_foreign".to_string(),
+            1 * NEAR,
+            "foreign_nft_contract".to_string(),
+        );
+
+        let data = UnfreezeNftData {
+            action_id: 1,
+            token_id: "test_nft".to_string(),
+        };
+        let secret: ExpandedSecretKey = (&kp.secret).into();
+        let sig = secret.sign(&(data.try_to_vec().unwrap()), &kp.public);
+
+        contract.validate_unfreeze_nft(data, sig.to_bytes().to_vec());
+    }
+
+    #[test]
+    fn mint_burn_nft() {
+        set_context("sender", 2 * NEAR);
+
+        let mut csprng = OsRng {};
+        let kp = Keypair::generate(&mut csprng);
+        let group_key: [u8; 32] = kp.public.to_bytes();
+
+        let mut contract = init_func(group_key);
+
+        let data = TransferNftData {
+            action_id: 1,
+            token_id: "test_nft".to_string(),
+            owner_id: env::predecessor_account_id(),
+            token_metadata: TokenMetadata {
+                title: Some("title".to_string()),
+                description: Some("description".to_string()),
+                media: None,
+                media_hash: None,
+                copies: None,
+                issued_at: None,
+                expires_at: None,
+                starts_at: None,
+                updated_at: None,
+                extra: None,
+                reference: None,
+                reference_hash: None,
+            },
+        };
+        let secret: ExpandedSecretKey = (&kp.secret).into();
+        let sig = secret.sign(&(data.try_to_vec().unwrap()), &kp.public);
+
+        contract.validate_transfer_nft(data, sig.to_bytes().to_vec());
+
+        contract.withdraw_nft(
+            "test_nft".to_string(),
+            0x0,
+            "address_of_foreign".to_string(),
+            1 * NEAR,
+        );
     }
 }
