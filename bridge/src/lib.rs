@@ -51,6 +51,13 @@ pub struct UpdateGroupkeyData {
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
+pub struct WhitelistData {
+    action_id: u128,
+    mint_with: String,
+}
+
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
 pub struct WithdrawFeeData {
     pub action_id: u128,
     pub account_id: String,
@@ -61,6 +68,7 @@ pub struct WithdrawFeeData {
 #[serde(crate = "near_sdk::serde")]
 pub struct TransferNftData {
     action_id: u128,
+    mint_with: String,
     token_id: TokenId,
     owner_id: AccountId,
     token_metadata: TokenMetadata,
@@ -81,6 +89,7 @@ pub struct XpBridge {
     tx_fees: u128,
     group_key: [u8; 32],
     action_cnt: u128,
+    whitelist: HashMap<String, bool>,
 }
 
 #[near_bindgen]
@@ -93,6 +102,7 @@ impl XpBridge {
             tx_fees: 0,
             group_key,
             action_cnt: 0,
+            whitelist: HashMap::new(),
         }
     }
 
@@ -160,6 +170,15 @@ impl XpBridge {
         self.group_key = data.group_key;
     }
 
+    #[payable]
+    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
+        require!(!self.paused, "paused");
+
+        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+
+        self.whitelist.insert(data.mint_with, true);
+    }
+
     /// Transfer foreign NFT. mint wrapped NFT
     #[payable]
     pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) {
@@ -167,7 +186,10 @@ impl XpBridge {
 
         self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
 
-        ext_xp_nft::ext(env::current_account_id()).nft_mint(
+        let f = self.whitelist.contains_key(&data.mint_with);
+        require!(f, "NFT contract is not whitelisted!");
+
+        ext_xp_nft::ext(data.mint_with.parse().unwrap()).nft_mint(
             data.token_id,
             data.owner_id,
             data.token_metadata,
@@ -187,6 +209,7 @@ impl XpBridge {
         Promise::new(env::current_account_id()).transfer(amt);
 
         self.action_cnt += 1;
+        self.tx_fees += amt;
 
         env::log_str(format!("chain_nonce: {}", chain_nonce).as_str());
         env::log_str(format!("to: {}", to).as_str());
@@ -217,6 +240,7 @@ impl XpBridge {
         Promise::new(env::current_account_id()).transfer(amt);
 
         self.action_cnt += 1;
+        self.tx_fees += amt;
 
         env::log_str(format!("chain_nonce: {}", chain_nonce).as_str());
         env::log_str(format!("to: {}", to).as_str());
@@ -376,8 +400,18 @@ mod tests {
 
         let mut contract = init_func(group_key);
 
-        let data = TransferNftData {
+        let data = WhitelistData {
             action_id: 1,
+            mint_with: "test_nft".to_string(),
+        };
+        let secret: ExpandedSecretKey = (&kp.secret).into();
+        let sig = secret.sign(&(data.try_to_vec().unwrap()), &kp.public);
+
+        contract.validate_whitelist(data, sig.to_bytes().to_vec());
+
+        let data = TransferNftData {
+            action_id: 2,
+            mint_with: "test_nft".to_string(),
             token_id: "test_nft".to_string(),
             owner_id: env::predecessor_account_id(),
             token_metadata: TokenMetadata {
