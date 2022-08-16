@@ -35,3 +35,9 @@ Deploying the contract
 ```
 near deploy --wasmFile target/wasm32-unknown-unknown/release/xp_bridge.wasm --accountId YOUR_ACCOUNT_HERE
 ```
+
+Switching chains (The default network for near-cli is testnet):
+
+```
+export NEAR_ENV=mainnet
+```
