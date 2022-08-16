@@ -22,6 +22,12 @@ cargo test -- --nocapture
 cargo build --all --target wasm32-unknown-unknown --release
 ```
 
+## Compiling both contracts to WASM
+
+```bash
+./build.sh
+```
+
 ### Deploying the smart contract
 
 Login with `near-cli`
