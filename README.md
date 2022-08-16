@@ -19,7 +19,7 @@ cargo test -- --nocapture
 ### Compile the code
 
 ```
-cargo build --target wasm32-unknown-unknown --release
+cargo build --all --target wasm32-unknown-unknown --release
 ```
 
 ### Deploying the smart contract
@@ -30,10 +30,11 @@ Login with `near-cli`
 near login
 ```
 
-Deploying the contract
+Deploying xpnft and bridge contract
 
 ```
-near deploy --wasmFile target/wasm32-unknown-unknown/release/xp_bridge.wasm --accountId YOUR_ACCOUNT_HERE
+near deploy --wasmFile target/wasm32-unknown-unknown/release/xpnft.wasm --accountId YOUR_ACCOUNT_HERE
+near deploy --wasmFile target/wasm32-unknown-unknown/release/bridge.wasm --accountId YOUR_ACCOUNT_HERE
 ```
 
 Switching chains (The default network for near-cli is testnet):
