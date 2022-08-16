@@ -1,0 +1,15 @@
+{
+  "name": "xp-near-integration",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/XP-NETWORK/xp-near-integration.git",
+  "author": "Dima Brook <dima@xp.network>",
+  "license": "MIT",
+  "scripts": {
+    "create_mainnet":"node ./src/create-mainnet-account.js",
+    "create_testnet":"node ./src/create-testnet-account.js"
+  },
+  "dependencies": {
+    "near-api-js": "^0.45.1"
+  }
+}

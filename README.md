@@ -28,6 +28,42 @@ cargo build --all --target wasm32-unknown-unknown --release
 ./build.sh
 ```
 
+## Creating accounts
+
+NB! An account can deploy only one smart contract on NEAR.
+
+Create as many accounts as you want to deploy contracts.
+
+The account's accountId is the address of the contract.
+
+### To create an account on the testnet:
+
+```bash
+yarn create_testnet <creatorAccountId> <newAccountId> <amount>
+```
+
+### To create an account on the mainnet:
+
+```bash
+yarn create_mainnet <creatorAccountId> <newAccountId> <amount>
+```
+
+Example:
+
+```
+yarn create_testnet dimabrook-testnet.testnet xpnft.testnet 20
+yarn create_testnet dimabrook-testnet.testnet xpbridge.testnet 20
+```
+
+### Checking that the accounts were created
+
+Example:
+
+```
+near keys xpnft.testnet
+```
+
+
 ### Deploying the smart contract
 
 Login with `near-cli`
