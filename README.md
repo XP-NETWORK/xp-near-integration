@@ -55,12 +55,27 @@ yarn create_testnet dimabrook-testnet.testnet xpnft.testnet 20
 yarn create_testnet dimabrook-testnet.testnet xpbridge.testnet 20
 ```
 
+Funding testnet accounts:
+
+Get 20 testnet Near every hour.
+
+```
+https://near-faucet.io/
+```
+
 ### Checking that the accounts were created
 
 Example:
 
 ```
 near keys xpnft.testnet
+```
+
+### Getting the account keypairs
+
+```
+cd ~/.near_credentials/testnet/
+nano <accountId>.json
 ```
 
 
