@@ -95,7 +95,7 @@ pub struct XpBridge {
 #[near_bindgen]
 impl XpBridge {
     #[init]
-    pub fn new(group_key: [u8; 32]) -> Self {
+    pub fn initialize(group_key: [u8; 32]) -> Self {
         Self {
             consumed_actions: HashMap::new(),
             paused: false,
@@ -293,7 +293,7 @@ mod tests {
     }
 
     fn init_func(group_key: [u8; 32]) -> XpBridge {
-        XpBridge::new(group_key)
+        XpBridge::initialize(group_key)
     }
 
     #[test]
