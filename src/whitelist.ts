@@ -29,14 +29,13 @@ dotenv.config();
     })
     try {
         const ed25519PrivateKey = Buffer.from(process.env.ED25519_PRIVATE_KEY || "", "hex")
-        const ed25519PublicKey = await ed.getPublicKey(ed25519PrivateKey)
         
-        const mintWith = process.env.XPNFT_ACCOUNT_ID || ""
-        const actionId = 0
+        const mintWith = process.argv[2]
+        const actionId = process.argv[3]
         const data = new WhitelistData(new BN(actionId), mintWith)
         const message = serialize(data)
         const signature = await ed.sign(message, ed25519PrivateKey)
-        await helper.whitelist(mintWith, actionId, signature)
+        await helper.whitelist(mintWith, parseInt(actionId), signature)
     } catch (e) {
         console.error(e)
     }

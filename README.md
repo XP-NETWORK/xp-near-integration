@@ -99,3 +99,15 @@ Switching chains (The default network for near-cli is testnet):
 ```
 export NEAR_ENV=mainnet
 ```
+
+### Initialize
+
+```
+yarn setup
+```
+
+### Whitelist NFT Contract
+
+```
+yarn whitelist <contractId> <actionId>
+```
