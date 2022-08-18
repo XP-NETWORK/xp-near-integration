@@ -6,7 +6,7 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{env, ext_contract, near_bindgen, require, AccountId, Promise, PromiseOrValue};
 
 use std::collections::HashMap;
-
+mod events;
 #[ext_contract(ext_xp_nft)]
 pub trait ExtXpNft {
     fn nft_mint(
@@ -211,11 +211,17 @@ impl XpBridge {
         self.action_cnt += 1;
         self.tx_fees += amt;
 
-        env::log_str(format!("chain_nonce: {}", chain_nonce).as_str());
-        env::log_str(format!("to: {}", to).as_str());
-        env::log_str(format!("nft_contract: {}", self.action_cnt).as_str());
-        env::log_str(format!("action_id: {}", self.action_cnt).as_str());
-        env::log_str(format!("yocto: {}", amt).as_str());
+        let unfreeze = events::UnfreezeNftEvent {
+            action_id: self.action_cnt,
+            chain_nonce,
+            to,
+            amt,
+        };
+
+        env::log_str(&format!(
+            r#"EVENT_JSON:{{ "type": "UnfreezeUnique", "data": {} }}"#,
+            serde_json::to_string(&unfreeze).unwrap()
+        ))
     }
 
     /// Freeze NEP-171 token.
@@ -242,12 +248,18 @@ impl XpBridge {
         self.action_cnt += 1;
         self.tx_fees += amt;
 
-        env::log_str(format!("chain_nonce: {}", chain_nonce).as_str());
-        env::log_str(format!("to: {}", to).as_str());
-        env::log_str(format!("mint_with: {}", mint_with).as_str());
-        env::log_str(format!("nft_contract: {}", self.action_cnt).as_str());
-        env::log_str(format!("action_id: {}", self.action_cnt).as_str());
-        env::log_str(format!("yocto: {}", amt).as_str());
+        let transfer = events::TransferNftEvent {
+            action_id: self.action_cnt,
+            chain_nonce,
+            mint_with,
+            to,
+            amt,
+        };
+
+        env::log_str(&format!(
+            r#"EVENT_JSON:{{ "type": "TransferUnique", "data": {} }}"#,
+            serde_json::to_string(&transfer).unwrap()
+        ))
     }
 
     /// Unfreeze NEP-171 token.
