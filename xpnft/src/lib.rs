@@ -23,7 +23,8 @@ use near_contract_standards::non_fungible_token::{Token, TokenId};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LazyOption;
 use near_sdk::{
-    env, near_bindgen, require, AccountId, BorshStorageKey, PanicOnDefault, Promise, PromiseOrValue,
+    assert_one_yocto, env, near_bindgen, require, AccountId, BorshStorageKey, PanicOnDefault,
+    Promise, PromiseOrValue,
 };
 
 #[near_bindgen]
@@ -102,6 +103,37 @@ impl Contract {
         );
         self.tokens
             .internal_mint(token_id, token_owner_id, Some(token_metadata))
+    }
+
+    #[payable]
+    pub fn nft_burn(&mut self, token_id: TokenId) {
+        assert_one_yocto();
+
+        let owner_id = self.tokens.owner_by_id.get(&token_id).unwrap();
+        assert_eq!(owner_id, env::predecessor_account_id(), "Token owner only");
+
+        if let Some(next_approval_id_by_id) = &mut self.tokens.next_approval_id_by_id {
+            next_approval_id_by_id.remove(&token_id);
+        }
+
+        if let Some(approvals_by_id) = &mut self.tokens.approvals_by_id {
+            approvals_by_id.remove(&token_id);
+        }
+
+        if let Some(tokens_per_owner) = &mut self.tokens.tokens_per_owner {
+            let mut token_ids = tokens_per_owner.get(&owner_id).unwrap();
+            token_ids.remove(&token_id);
+            tokens_per_owner.insert(&owner_id, &token_ids);
+        }
+
+        if let Some(token_metadata_by_id) = &mut self.tokens.token_metadata_by_id {
+            token_metadata_by_id.remove(&token_id);
+        }
+
+        env::log_str(&format!(
+            r#"EVENT_JSON:{{ "type": "nft_burn", "token_id": {} }}"#,
+            token_id
+        ))
     }
 }
 

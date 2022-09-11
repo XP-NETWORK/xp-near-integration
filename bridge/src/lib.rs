@@ -3,7 +3,10 @@ use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, ext_contract, near_bindgen, require, AccountId, Promise, PromiseOrValue};
+use near_sdk::{
+    env, ext_contract, near_bindgen, require, AccountId, Promise, PromiseOrValue, ONE_YOCTO,
+};
+use sha2::{Digest, Sha512};
 
 use std::collections::HashMap;
 mod events;
@@ -64,7 +67,7 @@ pub struct WithdrawFeeData {
     pub public_key: Vec<u8>,
 }
 
-#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct TransferNftData {
     action_id: u128,
@@ -110,15 +113,20 @@ impl XpBridge {
     /// Signature check for bridge actions.
     /// Consumes the passed action_id.
     #[private]
-    fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>) {
+    fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>, context: &[u8]) {
         let f = self.consumed_actions.contains_key(&action_id);
         require!(!f, "Duplicated Action");
 
         self.consumed_actions.insert(action_id, true);
 
+        let mut hasher = Sha512::new();
+        hasher.update(context);
+        hasher.update(data);
+        let hash = hasher.finalize();
+
         let sig = Signature::new(sig_data.as_slice().try_into().unwrap());
         let key = PublicKey::new(self.group_key);
-        let res = key.verify(data, &sig);
+        let res = key.verify(hash, &sig);
         require!(res.is_ok(), "Unauthorized Action");
     }
 
@@ -126,7 +134,12 @@ impl XpBridge {
     pub fn validate_pause(&mut self, data: PauseData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
-        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+        self.require_sig(
+            data.action_id,
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"SetPause",
+        );
 
         self.paused = true;
     }
@@ -135,7 +148,12 @@ impl XpBridge {
     pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Vec<u8>) {
         require!(self.paused, "unpaused");
 
-        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+        self.require_sig(
+            data.action_id,
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"SetUnpause",
+        );
 
         self.paused = false;
     }
@@ -148,7 +166,12 @@ impl XpBridge {
     ) -> PromiseOrValue<()> {
         require!(!self.paused, "paused");
 
-        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+        self.require_sig(
+            data.action_id,
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"WithdrawFees",
+        );
 
         let account_id: AccountId = data.account_id.parse().unwrap();
         let public_key = near_sdk::PublicKey::try_from(data.public_key).unwrap();
@@ -165,7 +188,12 @@ impl XpBridge {
     pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
-        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+        self.require_sig(
+            data.action_id,
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"SetGroupKey",
+        );
 
         self.group_key = data.group_key;
     }
@@ -174,7 +202,12 @@ impl XpBridge {
     pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
-        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+        self.require_sig(
+            data.action_id,
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"WhitelistNft",
+        );
 
         self.whitelist.insert(data.mint_with, true);
     }
@@ -184,16 +217,16 @@ impl XpBridge {
     pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
-        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
-
-        let f = self.whitelist.contains_key(&data.mint_with);
-        require!(f, "NFT contract is not whitelisted!");
-
-        ext_xp_nft::ext(data.mint_with.parse().unwrap()).nft_mint(
-            data.token_id,
-            data.owner_id,
-            data.token_metadata,
+        self.require_sig(
+            data.action_id,
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"ValidateTransferNft",
         );
+
+        ext_xp_nft::ext(data.mint_with.parse().unwrap())
+            .with_attached_deposit(near_sdk::ONE_NEAR / 100)
+            .nft_mint(data.token_id, data.owner_id, data.token_metadata);
     }
 
     /// Withdraw foreign NFT
@@ -204,6 +237,7 @@ impl XpBridge {
         require!(!self.paused, "paused");
 
         ext_xp_nft::ext(env::current_account_id())
+            .with_attached_deposit(ONE_YOCTO)
             .nft_burn(token_id, env::predecessor_account_id());
 
         Promise::new(env::current_account_id()).transfer(amt);
@@ -267,7 +301,12 @@ impl XpBridge {
     pub fn validate_unfreeze_nft(&mut self, data: UnfreezeNftData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
-        self.require_sig(data.action_id, data.try_to_vec().unwrap(), sig_data);
+        self.require_sig(
+            data.action_id,
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"ValidateUnfreezeNft",
+        );
 
         ext_nft::ext(env::current_account_id()).nft_transfer(
             env::signer_account_id(),
@@ -275,6 +314,47 @@ impl XpBridge {
             None,
             None,
         );
+    }
+
+    pub fn encode_transfer_action(
+        &self,
+        action_id: u128,
+        mint_with: String,
+        owner_id: AccountId,
+        token_id: String,
+        title: String,
+        description: String,
+        media: String,
+    ) -> Vec<u8> {
+        let data = TransferNftData {
+            action_id,
+            mint_with,
+            owner_id,
+            token_id,
+            token_metadata: TokenMetadata {
+                title: Some(title),
+                description: Some(description),
+                media: Some(media),
+                media_hash: None,
+                copies: None,
+                issued_at: None,
+                expires_at: None,
+                starts_at: None,
+                updated_at: None,
+                extra: None,
+                reference: None,
+                reference_hash: None,
+            },
+        };
+        data.try_to_vec().unwrap()
+    }
+
+    pub fn encode_unfreeze_action(&self, action_id: u128, token_id: String) -> Vec<u8> {
+        let event = UnfreezeNftData {
+            action_id,
+            token_id,
+        };
+        event.try_to_vec().unwrap()
     }
 
     pub fn get_group_key(&self) -> [u8; 32] {
@@ -321,6 +401,37 @@ mod tests {
         assert_eq!(group_key, contract.get_group_key());
     }
 
+    // #[test]
+    // fn test_sig() {
+    //     // set_context("admin", 1 * NEAR);
+    //     let pk: ExpandedSecretKey = ExpandedSecretKey::from_bytes(&[
+    //         101, 99, 54, 99, 56, 50, 50, 52, 55, 100, 98, 98, 49, 53, 56, 57, 98, 101, 98, 48, 99,
+    //         102, 51, 57, 102, 52, 101, 55, 97, 50, 100, 97, 52, 50, 98, 102, 101, 102, 48, 102, 55,
+    //         100, 98, 97, 51, 49, 50, 97, 102, 51, 100, 102, 56, 98, 52, 56, 56, 97, 55, 51, 100,
+    //         55, 48, 55,
+    //     ])
+    //     .unwrap();
+
+    //     let gk = PublicKey::from(&pk);
+
+    //     let data = hex::decode("668a04000000000000000000000000000d00000078706e66742e746573746e65741a00000030783633313931376262306538336338656164383132656535640f00000069616d736b31372e746573746e65740106000000556e69616972019e0000004f6e652077697468207468652063616c6d2c2074686520556e6961697220697320612073706563696573207468617420656e6a6f797320746865207472616e7175696c6c697479206f6620656c65766174696f6e2e2041207472756520756e646572646f672c2074686520556e6961697220676976657320616e20656e64656172696e672070726573656e63652077697468206576657279206d6f76652e013e00000068747470733a2f2f6173736574732e706f6c6b616d6f6e2e636f6d2f696d616765732f556e696d6f6e735f5430364330324831304230344730302e6a7067000000000000000000").unwrap();
+
+    //     let transfer = TransferNftData::try_from_slice(&data).unwrap();
+
+    //     let sig = pk.sign(&data, &gk);
+
+    //     let group_key: [u8; 32] = gk.to_bytes();
+
+    //     let mut contract = init_func(group_key);
+    //     contract.require_sig(
+    //         297574,
+    //         data,
+    //         sig.to_bytes().to_vec(),
+    //         b"ValidateTransferNft",
+    //     );
+
+    //     assert_eq!(group_key, contract.get_group_key());
+    // }
     #[test]
     fn pause_unpause() {
         set_context("admin", 1 * NEAR);
