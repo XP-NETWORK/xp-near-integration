@@ -1,28 +1,18 @@
 {
-  "name": "xp-near-integration",
+  "name": "xpbridge",
   "version": "1.0.0",
-  "main": "index.js",
-  "repository": "https://github.com/XP-NETWORK/xp-near-integration.git",
-  "author": "Dima Brook <dima@xp.network>",
-  "license": "MIT",
+  "license": "(MIT AND Apache-2.0)",
   "scripts": {
-    "create_mainnet": "ts-node ./src/create-mainnet-account.ts",
-    "create_testnet": "ts-node ./src/create-testnet-account.ts",
-    "deploy": "ts-node ./src/deploy.ts",
-    "setup": "ts-node ./src/setup.ts",
-    "whitelist": "ts-node ./src/whitelist.ts"
-  },
-  "dependencies": {
-    "@dao-xyz/borsh": "^2.1.6",
-    "@noble/ed25519": "^1.6.1",
-    "bn.js": "^5.2.1",
-    "dotenv": "^16.0.1",
-    "near-api-js": "^0.45.1"
+    "deploy": "cd contract && ./deploy.sh",
+    "build": "npm run build:contract",
+    "build:contract": "cd contract && ./build.sh",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "cd contract && cargo test",
+    "test:integration": "cd integration-tests && npm test -- -- \"./contract/target/wasm32-unknown-unknown/release/xpnft.wasm\" \"./contract/target/wasm32-unknown-unknown/release/xpbridge.wasm\"",
+    "postinstall": "echo no frontend && cd integration-tests && yarn install && cd .. && echo rs contract"
   },
   "devDependencies": {
-    "@types/bn.js": "^5.1.0",
-    "@types/node": "^18.7.6",
-    "ts-node": "^10.9.1",
-    "typescript": "^4.7.4"
-  }
+    "near-cli": "^3.3.0"
+  },
+  "dependencies": {}
 }
