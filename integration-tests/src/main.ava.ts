@@ -1,5 +1,8 @@
 import { Worker, NearAccount } from 'near-workspaces';
 import anyTest, { TestFn } from 'ava';
+import dotenv from 'dotenv'
+
+dotenv.config();
 
 const test = anyTest as TestFn<{
   worker: Worker;

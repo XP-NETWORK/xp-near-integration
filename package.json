@@ -11,8 +11,5 @@
     "test:integration": "cd integration-tests && npm test -- -- \"./contract/target/wasm32-unknown-unknown/release/xpnft.wasm\" \"./contract/target/wasm32-unknown-unknown/release/xpbridge.wasm\"",
     "postinstall": "echo no frontend && cd integration-tests && yarn install && cd .. && echo rs contract"
   },
-  "devDependencies": {
-    "near-cli": "^3.3.0"
-  },
   "dependencies": {}
 }
