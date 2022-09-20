@@ -233,12 +233,19 @@ impl XpBridge {
     /// WARN: Even though this contract doesn't check if the burner is trusted,
     /// we check this in the bridge infrastructure(i.e in the validator)
     #[payable]
-    pub fn withdraw_nft(&mut self, token_id: TokenId, chain_nonce: u8, to: String, amt: u128) {
+    pub fn withdraw_nft(
+        &mut self,
+        token_id: TokenId,
+        chain_nonce: u8,
+        to: String,
+        amt: u128,
+        token_contract: AccountId,
+    ) {
         require!(!self.paused, "paused");
 
-        ext_xp_nft::ext(env::current_account_id())
+        ext_xp_nft::ext(token_contract.clone())
             .with_attached_deposit(ONE_YOCTO)
-            .nft_burn(token_id, env::predecessor_account_id());
+            .nft_burn(token_id.clone(), env::predecessor_account_id());
 
         Promise::new(env::current_account_id()).transfer(amt);
 
@@ -250,6 +257,8 @@ impl XpBridge {
             chain_nonce,
             to,
             amt,
+            contract: token_contract,
+            token_id,
         };
 
         env::log_str(&format!(
@@ -267,12 +276,13 @@ impl XpBridge {
         to: String,
         amt: u128,
         mint_with: String,
+        token_contract: AccountId,
     ) {
         require!(!self.paused, "paused");
 
-        ext_nft::ext(env::predecessor_account_id()).nft_transfer(
+        ext_nft::ext(token_contract.clone()).nft_transfer(
             env::current_account_id(),
-            token_id,
+            token_id.clone(),
             None,
             None,
         );
@@ -288,6 +298,8 @@ impl XpBridge {
             mint_with,
             to,
             amt,
+            contract: token_contract,
+            token_id,
         };
 
         env::log_str(&format!(
