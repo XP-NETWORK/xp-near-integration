@@ -18,12 +18,32 @@ interface WhitelistParam {
     }
 }
 
+interface PauseParam {
+    args: {
+        data: {
+            action_id: string,
+        },
+        sig_data: string
+    }
+}
+
+interface UnpauseParam {
+    args: {
+        data: {
+            action_id: string,
+        },
+        sig_data: string
+    }
+}
+
 interface BridgeContract extends Contract {
     initialize(param: InitParam): Promise<any>,
     get_group_key(): Promise<number[]>,
     is_paused(): Promise<any>,
     is_whitelist(param: { contract_id: string }): Promise<boolean>,
-    validate_whitelist(param: WhitelistParam): Promise<any>,
+    validate_whitelist(param: WhitelistParam): Promise<void>,
+    validate_pause(param: PauseParam): Promise<void>,
+    validate_unpause(param: UnpauseParam): Promise<void>,
 }
 
 export interface NearProvider {
@@ -83,6 +103,28 @@ export class BridgeHelper {
                     action_id: actionId.toString(),
                     contract_id: this.contract.contractId,
                     mint_with: nftContractId,
+                },
+                sig_data: Buffer.from(signature).toString("base64")
+            }
+        })
+    }
+
+    async pause(actionId: BN, signature: Uint8Array) {
+        return await this.contract.validate_pause({
+            args: {
+                data: {
+                    action_id: actionId.toString(),
+                },
+                sig_data: Buffer.from(signature).toString("base64")
+            }
+        })
+    }
+
+    async unpause(actionId: BN, signature: Uint8Array) {
+        return await this.contract.validate_unpause({
+            args: {
+                data: {
+                    action_id: actionId.toString(),
                 },
                 sig_data: Buffer.from(signature).toString("base64")
             }

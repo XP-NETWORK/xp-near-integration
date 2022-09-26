@@ -27,7 +27,7 @@ pub struct UnpauseData {
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct UpdateGroupkeyData {
-    action_id: u128,
+    action_id: U128,
     group_key: [u8; 32],
 }
 
@@ -35,7 +35,6 @@ pub struct UpdateGroupkeyData {
 #[serde(crate = "near_sdk::serde")]
 pub struct WhitelistData {
     action_id: U128,
-    contract_id: String,
     mint_with: String,
 }
 
@@ -159,19 +158,18 @@ impl XpBridge {
     //         .into()
     // }
 
-    // #[payable]
-    // pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
-    //     require!(!self.paused, "paused");
+    #[payable]
+    pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Base64VecU8) {
+        require!(!self.paused, "paused");
 
-    //     self.require_sig(
-    //         data.action_id,
-    //         data.try_to_vec().unwrap(),
-    //         sig_data,
-    //         b"SetGroupKey",
-    //     );
+        self.require_sig(
+            data.action_id.into(),
+            data.try_to_vec().unwrap(),
+            sig_data.into(),
+        );
 
-    //     self.group_key = data.group_key;
-    // }
+        self.group_key = data.group_key;
+    }
 
     #[payable]
     pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Base64VecU8) {
@@ -351,9 +349,9 @@ impl XpBridge {
         self.whitelist.contains_key(&contract_id)
     }
 
-    // pub fn is_paused(&self) -> bool {
-    //     self.paused
-    // }
+    pub fn is_paused(&self) -> bool {
+        self.paused
+    }
 }
 
 // #[cfg(all(test, not(target_arch = "wasm32")))]

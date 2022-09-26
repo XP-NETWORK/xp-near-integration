@@ -7,7 +7,7 @@ import { Worker } from 'near-workspaces';
 import { Account, connect, keyStores, Near } from "near-api-js";
 import { BridgeHelper, XpnftHelper } from '../src/helper';
 import BN from 'bn.js';
-import { WhitelistData } from '../src/encode';
+import { PauseData, UnpauseData, WhitelistData } from '../src/encode';
 
 describe("bridge", async () => {
     let worker: Worker;
@@ -87,7 +87,7 @@ describe("bridge", async () => {
 
     it("whitelist nft", async () => {
         const actionId = new BN(0);
-        const data = new WhitelistData(actionId, bridgeContract.getContractId(), xpnftContract.getContractId())
+        const data = new WhitelistData(actionId, xpnftContract.getContractId())
         const message = serialize(data)
         const msgHash = createHash("SHA256").update(message).digest();
         const signature = await ed.sign(msgHash, sk)
@@ -95,6 +95,30 @@ describe("bridge", async () => {
 
         const flag = await bridgeContract.isWhitelist(xpnftContract.getContractId())
         assert.ok(flag)
+    })
+
+    it("pause bridge", async () => {
+        const actionId = new BN(1);
+        const data = new PauseData(actionId)
+        const message = serialize(data)
+        const msgHash = createHash("SHA256").update(message).digest();
+        const signature = await ed.sign(msgHash, sk)
+        await bridgeContract.pause(actionId, signature)
+
+        const flag = await bridgeContract.isPaused()
+        assert.ok(flag)
+    })
+
+    it("unpause bridge", async () => {
+        const actionId = new BN(2);
+        const data = new UnpauseData(actionId)
+        const message = serialize(data)
+        const msgHash = createHash("SHA256").update(message).digest();
+        const signature = await ed.sign(msgHash, sk)
+        await bridgeContract.unpause(actionId, signature)
+
+        const flag = await bridgeContract.isPaused()
+        assert.ok(!flag)
     })
 
     after(async () => {

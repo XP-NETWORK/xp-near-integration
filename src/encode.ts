@@ -5,26 +5,31 @@ export class WhitelistData {
     @field({ type: "u128" })
     actionId: BN;
     @field({ type: "string" })
-    contractId: string;
-    @field({ type: "string" })
     mintWith: string;
 
-    constructor(actionId: BN, contractId: string, mintWith: string) {
+    constructor(actionId: BN, mintWith: string) {
         this.actionId = actionId
-        this.contractId = contractId
         this.mintWith = mintWith
     }
 }
 
-// export class PauseData {
-//     @field({ type: "u64" })
-//     actionId: BN;
-// }
+export class PauseData {
+    @field({ type: "u128" })
+    actionId: BN;
 
-// export class UnpauseData {
-//     @field({ type: "u64" })
-//     actionId: BN;
-// }
+    constructor(actionId: BN) {
+        this.actionId = actionId
+    }
+}
+
+export class UnpauseData {
+    @field({ type: "u128" })
+    actionId: BN;
+
+    constructor(actionId: BN) {
+        this.actionId = actionId
+    }
+}
 
 // export class UpdateGroupkeyData {
 //     @field({ type: "u64" })
