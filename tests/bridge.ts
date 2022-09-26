@@ -67,7 +67,7 @@ describe("bridge", async () => {
         await xpnftAcc.deployContract(
             fs.readFileSync(
                 __dirname +
-                "/../contract/target/wasm32-unknown-unknown/release/xpnft.wasm"
+                    "/../contract/target/wasm32-unknown-unknown/release/xpnft.wasm"
             )
         );
 
@@ -75,7 +75,7 @@ describe("bridge", async () => {
         await bridgeAcc.deployContract(
             fs.readFileSync(
                 __dirname +
-                "/../contract/target/wasm32-unknown-unknown/release/xpbridge.wasm"
+                    "/../contract/target/wasm32-unknown-unknown/release/xpbridge.wasm"
             )
         );
 
@@ -89,7 +89,10 @@ describe("bridge", async () => {
     });
 
     it("initialize xpnft", async () => {
-        const xpnftHelper = new XpnftHelper(xpnftAcc.accountId, collectionOwnerAcc);
+        const xpnftHelper = new XpnftHelper(
+            xpnftAcc.accountId,
+            collectionOwnerAcc
+        );
         const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
 
         await xpnftHelper.initialize(bridgeHelper.getContractId(), {
@@ -125,9 +128,7 @@ describe("bridge", async () => {
         const signature = await ed.sign(msgHash, sk);
         await bridgeHelper.whitelist(data, signature);
 
-        const flag = await bridgeHelper.isWhitelist(
-            xpnftAcc.accountId
-        );
+        const flag = await bridgeHelper.isWhitelist(xpnftAcc.accountId);
         assert.ok(flag);
     });
 
@@ -193,11 +194,17 @@ describe("bridge", async () => {
 
     it("withdraw nft:0", async () => {
         const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, nftOwnerAcc);
-        const chainNonce = 0
-        const to = "example_address"
-        const amt = new BN(1_000_000_000_000)
-        await bridgeHelper.withdrawNft(xpnftAcc.accountId, "0", chainNonce, to, amt)
-    })
+        const chainNonce = 0;
+        const to = "example_address";
+        const amt = new BN(1_000_000_000_000);
+        await bridgeHelper.withdrawNft(
+            xpnftAcc.accountId,
+            "0",
+            chainNonce,
+            to,
+            amt
+        );
+    });
 
     after(async () => {
         await worker.tearDown().catch((error) => {

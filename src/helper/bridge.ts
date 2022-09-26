@@ -58,12 +58,12 @@ interface TransferNftParam {
 
 interface WithdrawNftParam {
     args: {
-        token_contract: string,
-        token_id: string,
-        chain_nonce: number,
-        to: string,
-        amt: string,
-    }
+        token_contract: string;
+        token_id: string;
+        chain_nonce: number;
+        to: string;
+        amt: string;
+    };
 }
 
 interface BridgeContract extends Contract {
@@ -185,7 +185,7 @@ export class BridgeHelper {
                         updated_at: data.tokenMetadata.updatedAt,
                         extra: data.tokenMetadata.extra,
                         reference: data.tokenMetadata.reference,
-                        reference_hash: data.tokenMetadata.referenceHash
+                        reference_hash: data.tokenMetadata.referenceHash,
                     },
                 },
                 sig_data: Buffer.from(signature).toString("base64"),
@@ -193,15 +193,21 @@ export class BridgeHelper {
         });
     }
 
-    async withdrawNft(collection: string, tokenId: string, chainNoce: number, to: string, amt: BN) {
+    async withdrawNft(
+        collection: string,
+        tokenId: string,
+        chainNoce: number,
+        to: string,
+        amt: BN
+    ) {
         return await this.contract.withdraw_nft({
             args: {
                 token_contract: collection,
                 token_id: tokenId,
                 chain_nonce: chainNoce,
                 to,
-                amt: amt.toString()
-            }
-        })
+                amt: amt.toString(),
+            },
+        });
     }
 }
