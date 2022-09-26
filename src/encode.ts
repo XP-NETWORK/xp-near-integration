@@ -1,5 +1,5 @@
 import { field, fixedArray, option, vec } from "@dao-xyz/borsh";
-import BN from "bn.js"
+import BN from "bn.js";
 
 export class WhitelistData {
     @field({ type: "u128" })
@@ -7,9 +7,8 @@ export class WhitelistData {
     @field({ type: "string" })
     mintWith: string;
 
-    constructor(actionId: BN, mintWith: string) {
-        this.actionId = actionId
-        this.mintWith = mintWith
+    constructor(data: WhitelistData) {
+        Object.assign(this, data);
     }
 }
 
@@ -17,8 +16,8 @@ export class PauseData {
     @field({ type: "u128" })
     actionId: BN;
 
-    constructor(actionId: BN) {
-        this.actionId = actionId
+    constructor(data: PauseData) {
+        Object.assign(this, data);
     }
 }
 
@@ -26,8 +25,8 @@ export class UnpauseData {
     @field({ type: "u128" })
     actionId: BN;
 
-    constructor(actionId: BN) {
-        this.actionId = actionId
+    constructor(data: UnpauseData) {
+        Object.assign(this, data);
     }
 }
 
@@ -45,26 +44,53 @@ export class UnpauseData {
 //     share: number;
 // }
 
-// export class TransferNftData {
-//     @field({ type: "u64" })
-//     actionId: BN;
-//     @field({ type: "u64" })
-//     chainNonce: BN;
-//     @field({ type: "String" })
-//     name: string;
-//     @field({ type: "String" })
-//     symbol: string;
-//     @field({ type: "String" })
-//     uri: string;
-//     @field({ type: fixedArray("u8", 32) })
-//     owner: number[];
-//     @field({ type: option(fixedArray("u8", 32)) })
-//     collection: number[] | undefined;
-//     @field({ type: option("u16") })
-//     sellerFeeBasisPoints: number | undefined;
-//     @field({ type: option(vec(CreatorData)) })
-//     creators: CreatorData[] | undefined;
-// }
+export class TokenMetadataData {
+    @field({ type: option("string") })
+    title: string | undefined;
+    @field({ type: option("string") })
+    description: string | undefined;
+    @field({ type: option("string") })
+    media: string | undefined;
+    @field({ type: option(vec("u8")) })
+    media_hash: Uint8Array | undefined;
+    @field({ type: option("u64") })
+    copies: number | undefined;
+    @field({ type: option("string") })
+    issued_at: string | undefined;
+    @field({ type: option("string") })
+    expires_at: string | undefined;
+    @field({ type: option("string") })
+    starts_at: string | undefined;
+    @field({ type: option("string") })
+    updated_at: string | undefined;
+    @field({ type: option("string") })
+    extra: string | undefined;
+    @field({ type: option("string") })
+    reference: string | undefined;
+    @field({ type: option(vec("u8")) })
+    reference_hash: Uint8Array | undefined;
+
+    constructor(data: TokenMetadataData) {
+        Object.assign(this, data);
+    }
+}
+
+export class TransferNftData {
+    @field({ type: "u128" })
+    actionId: BN;
+    @field({ type: "string" })
+    mintWith: string;
+    @field({ type: "string" })
+    tokenId: string;
+    @field({ type: "string" })
+    tokenOwnerId: string;
+    @field({ type: TokenMetadataData })
+    tokenMetadata: TokenMetadataData;
+
+    constructor(data: TransferNftData) {
+        Object.assign(this, data);
+    }
+}
 
 // export class UnfreezeNftData {
 //     @field({ type: "u64" })

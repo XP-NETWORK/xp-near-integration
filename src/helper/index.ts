@@ -1,2 +1,2 @@
-export * from "./xpnft"
-export * from "./bridge"
+export * from "./xpnft";
+export * from "./bridge";

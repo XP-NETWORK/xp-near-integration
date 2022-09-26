@@ -3,9 +3,11 @@ use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::env::sha256;
-use near_sdk::json_types::{U128, Base64VecU8};
+use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseOrValue, ONE_YOCTO};
+use near_sdk::{
+    env, near_bindgen, require, AccountId, Promise, PromiseError, PromiseOrValue, ONE_YOCTO,
+};
 
 use std::collections::HashMap;
 mod events;
@@ -49,8 +51,8 @@ pub struct WithdrawFeeData {
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct TransferNftData {
-    action_id: u128,
-    mint_with: String,
+    action_id: U128,
+    mint_with: AccountId,
     token_id: TokenId,
     owner_id: AccountId,
     token_metadata: TokenMetadata,
@@ -78,7 +80,10 @@ pub struct XpBridge {
 impl XpBridge {
     #[init]
     pub fn initialize(group_key: [u8; 32]) -> Self {
-        assert!(env::current_account_id() == env::predecessor_account_id(), "Unauthorized");
+        assert!(
+            env::current_account_id() == env::predecessor_account_id(),
+            "Unauthorized"
+        );
 
         Self {
             consumed_actions: HashMap::new(),
@@ -164,7 +169,7 @@ impl XpBridge {
 
         self.require_sig(
             data.action_id.into(),
-            data.try_to_vec().unwrap(),
+            sha256(data.try_to_vec().unwrap().as_slice()),
             sig_data.into(),
         );
 
@@ -184,22 +189,44 @@ impl XpBridge {
         self.whitelist.insert(data.mint_with, true);
     }
 
-    // /// Transfer foreign NFT. mint wrapped NFT
-    // #[payable]
-    // pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) {
-    //     require!(!self.paused, "paused");
+    /// Transfer foreign NFT. mint wrapped NFT
+    #[payable]
+    pub fn validate_transfer_nft(
+        &mut self,
+        data: TransferNftData,
+        sig_data: Base64VecU8,
+    ) -> Promise {
+        require!(!self.paused, "paused");
 
-    //     self.require_sig(
-    //         data.action_id,
-    //         data.try_to_vec().unwrap(),
-    //         sig_data,
-    //         b"ValidateTransferNft",
-    //     );
+        require!(
+            self.whitelist.contains_key(&data.mint_with.to_string()),
+            "Not whitelist"
+        );
 
-    //     xpnft::ext(data.mint_with.parse().unwrap())
-    //         .with_attached_deposit(near_sdk::ONE_NEAR / 100)
-    //         .nft_mint(data.token_id, data.owner_id, data.token_metadata);
-    // }
+        self.require_sig(
+            data.action_id.into(),
+            sha256(data.try_to_vec().unwrap().as_slice()),
+            sig_data.into(),
+        );
+
+        xpnft::ext(data.mint_with)
+            .with_attached_deposit(near_sdk::ONE_NEAR / 100)
+            .nft_mint(data.token_id, data.owner_id, data.token_metadata)
+            .then(Self::ext(env::current_account_id()).transfer_nft_callback())
+    }
+
+    #[private]
+    pub fn transfer_nft_callback(
+        &self,
+        #[callback_result] call_result: Result<(), PromiseError>,
+    ) -> bool {
+        // Return whether or not the promise succeeded using the method outlined in external.rs
+        if call_result.is_err() {
+            return false;
+        } else {
+            return true;
+        }
+    }
 
     // /// Withdraw foreign NFT
     // /// WARN: Even though this contract doesn't check if the burner is trusted,

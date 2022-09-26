@@ -1,49 +1,64 @@
 import BN from "bn.js";
 import { Account, Contract } from "near-api-js";
+import { TokenMetadata } from "./xpnft";
 
 interface InitParam {
     args: {
-        group_key: number[]
-    }
+        group_key: number[];
+    };
 }
 
 interface WhitelistParam {
     args: {
         data: {
-            action_id: string,
-            contract_id: string,
-            mint_with: string,
-        },
-        sig_data: string
-    }
+            action_id: string;
+            contract_id: string;
+            mint_with: string;
+        };
+        sig_data: string;
+    };
 }
 
 interface PauseParam {
     args: {
         data: {
-            action_id: string,
-        },
-        sig_data: string
-    }
+            action_id: string;
+        };
+        sig_data: string;
+    };
 }
 
 interface UnpauseParam {
     args: {
         data: {
-            action_id: string,
-        },
-        sig_data: string
-    }
+            action_id: string;
+        };
+        sig_data: string;
+    };
+}
+
+interface TransferNftParam {
+    args: {
+        data: {
+            action_id: string;
+            mint_with: string;
+            token_id: string;
+            owner_id: string;
+            token_metadata: TokenMetadata;
+        };
+        sig_data: string;
+    };
 }
 
 interface BridgeContract extends Contract {
-    initialize(param: InitParam): Promise<any>,
-    get_group_key(): Promise<number[]>,
-    is_paused(): Promise<any>,
-    is_whitelist(param: { contract_id: string }): Promise<boolean>,
-    validate_whitelist(param: WhitelistParam): Promise<void>,
-    validate_pause(param: PauseParam): Promise<void>,
-    validate_unpause(param: UnpauseParam): Promise<void>,
+    initialize(param: InitParam): Promise<any>;
+    get_group_key(): Promise<number[]>;
+    is_paused(): Promise<any>;
+    is_whitelist(param: { contract_id: string }): Promise<boolean>;
+    validate_whitelist(param: WhitelistParam): Promise<void>;
+    validate_pause(param: PauseParam): Promise<void>;
+    validate_unpause(param: UnpauseParam): Promise<void>;
+    validate_transfer_nft(param: TransferNftParam): Promise<any>;
 }
 
 export interface NearProvider {
@@ -52,15 +67,11 @@ export interface NearProvider {
 }
 
 export class BridgeHelper {
-    private contract: BridgeContract
+    private contract: BridgeContract;
 
     constructor(signer: Account, contractId: string) {
         this.contract = new Contract(signer, contractId, {
-            viewMethods: [
-                "get_group_key",
-                "is_paused",
-                "is_whitelist",
-            ],
+            viewMethods: ["get_group_key", "is_paused", "is_whitelist"],
             changeMethods: [
                 "initialize",
                 "validate_pause",
@@ -71,32 +82,42 @@ export class BridgeHelper {
                 "validate_transfer_nft",
                 "withdraw_nft",
                 "freeze_nft",
-                "validate_unfreeze_nft"
-            ]
-        }) as BridgeContract
+                "validate_unfreeze_nft",
+            ],
+        }) as BridgeContract;
     }
 
     getContractId() {
-        return this.contract.contractId
+        return this.contract.contractId;
     }
 
     async getGroupKey() {
-        return await this.contract.get_group_key()
+        return await this.contract.get_group_key();
     }
 
     async isPaused() {
-        return await this.contract.is_paused()
+        return await this.contract.is_paused();
+    }
+
+    async isWhitelist(contractId: string) {
+        return await this.contract.is_whitelist({
+            contract_id: contractId,
+        });
     }
 
     async initialize(groupKey: Uint8Array) {
         return await this.contract.initialize({
             args: {
-                group_key: Array.from(groupKey)
-            }
-        })
+                group_key: Array.from(groupKey),
+            },
+        });
     }
 
-    async whitelist(nftContractId: string, actionId: BN, signature: Uint8Array) {
+    async whitelist(
+        nftContractId: string,
+        actionId: BN,
+        signature: Uint8Array
+    ) {
         return await this.contract.validate_whitelist({
             args: {
                 data: {
@@ -104,9 +125,9 @@ export class BridgeHelper {
                     contract_id: this.contract.contractId,
                     mint_with: nftContractId,
                 },
-                sig_data: Buffer.from(signature).toString("base64")
-            }
-        })
+                sig_data: Buffer.from(signature).toString("base64"),
+            },
+        });
     }
 
     async pause(actionId: BN, signature: Uint8Array) {
@@ -115,9 +136,9 @@ export class BridgeHelper {
                 data: {
                     action_id: actionId.toString(),
                 },
-                sig_data: Buffer.from(signature).toString("base64")
-            }
-        })
+                sig_data: Buffer.from(signature).toString("base64"),
+            },
+        });
     }
 
     async unpause(actionId: BN, signature: Uint8Array) {
@@ -126,14 +147,30 @@ export class BridgeHelper {
                 data: {
                     action_id: actionId.toString(),
                 },
-                sig_data: Buffer.from(signature).toString("base64")
-            }
-        })
+                sig_data: Buffer.from(signature).toString("base64"),
+            },
+        });
     }
 
-    async isWhitelist(contractId: string) {
-        return await this.contract.is_whitelist({
-            contract_id: contractId
-        })
+    async transferNft(
+        actionId: BN,
+        mintWith: string,
+        tokenId: BN,
+        ownerId: string,
+        metadata: TokenMetadata,
+        signature: Uint8Array
+    ) {
+        return await this.contract.validate_transfer_nft({
+            args: {
+                data: {
+                    action_id: actionId.toString(),
+                    mint_with: mintWith,
+                    token_id: tokenId.toString(),
+                    owner_id: ownerId,
+                    token_metadata: metadata,
+                },
+                sig_data: Buffer.from(signature).toString("base64"),
+            },
+        });
     }
 }
