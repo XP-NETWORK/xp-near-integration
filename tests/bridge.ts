@@ -1,8 +1,13 @@
+import assert from 'assert';
 import * as fs from 'fs'
+import { createHash } from "crypto";
+import { serialize } from '@dao-xyz/borsh';
 import * as ed from "@noble/ed25519";
 import { Worker } from 'near-workspaces';
 import { Account, connect, keyStores, Near } from "near-api-js";
 import { BridgeHelper, XpnftHelper } from '../src/helper';
+import BN from 'bn.js';
+import { WhitelistData } from '../src/encode';
 
 describe("bridge", async () => {
     let worker: Worker;
@@ -15,6 +20,7 @@ describe("bridge", async () => {
     let bridgeContract: BridgeHelper;
 
     let pk: Uint8Array;
+    let sk: Uint8Array;
 
     before(async () => {
         // Init the worker and start a Sandbox server
@@ -54,9 +60,9 @@ describe("bridge", async () => {
         nftOwnerAcc = await nearConnection.account(nftOwner.accountId)
 
         xpnftContract = new XpnftHelper(collectionOwnerAcc, xpnft.accountId)
-        bridgeContract = new BridgeHelper(collectionOwnerAcc, xpbridge.accountId)
+        bridgeContract = new BridgeHelper(bridgeAcc, xpbridge.accountId)
 
-        const sk = ed.utils.randomPrivateKey()
+        sk = ed.utils.randomPrivateKey()
         pk = await ed.getPublicKey(sk)
     })
 
@@ -74,6 +80,21 @@ describe("bridge", async () => {
 
     it("initialize bridge", async () => {
         await bridgeContract.initialize(pk)
+
+        const storedPk = await bridgeContract.getGroupKey()
+        assert.ok(Buffer.from(pk).equals(Buffer.from(storedPk)))
+    })
+
+    it("whitelist nft", async () => {
+        const actionId = new BN(0);
+        const data = new WhitelistData(actionId, bridgeContract.getContractId(), xpnftContract.getContractId())
+        const message = serialize(data)
+        const msgHash = createHash("SHA256").update(message).digest();
+        const signature = await ed.sign(msgHash, sk)
+        await bridgeContract.whitelist(xpnftContract.getContractId(), actionId, signature)
+
+        const flag = await bridgeContract.isWhitelist(xpnftContract.getContractId())
+        assert.ok(flag)
     })
 
     after(async () => {

@@ -5,10 +5,13 @@ export class WhitelistData {
     @field({ type: "u128" })
     actionId: BN;
     @field({ type: "string" })
+    contractId: string;
+    @field({ type: "string" })
     mintWith: string;
 
-    constructor(actionId: BN, mintWith: string) {
+    constructor(actionId: BN, contractId: string, mintWith: string) {
         this.actionId = actionId
+        this.contractId = contractId
         this.mintWith = mintWith
     }
 }

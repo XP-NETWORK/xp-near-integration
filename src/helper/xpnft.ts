@@ -112,4 +112,8 @@ export class XpnftHelper {
             token_id: tokenId
         })
     }
+
+    getContractId() {
+        return this.contract.contractId
+    }
 }

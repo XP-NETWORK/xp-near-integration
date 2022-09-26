@@ -2,9 +2,10 @@ use ed25519_compact::{PublicKey, Signature};
 use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::env::sha256;
+use near_sdk::json_types::{U128, Base64VecU8};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseOrValue, ONE_YOCTO};
-use sha2::{Digest, Sha512};
 
 use std::collections::HashMap;
 mod events;
@@ -14,13 +15,13 @@ pub use crate::external::*;
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct PauseData {
-    action_id: u128,
+    action_id: U128,
 }
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct UnpauseData {
-    action_id: u128,
+    action_id: U128,
 }
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -33,7 +34,8 @@ pub struct UpdateGroupkeyData {
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct WhitelistData {
-    action_id: u128,
+    action_id: U128,
+    contract_id: String,
     mint_with: String,
 }
 
@@ -93,269 +95,265 @@ impl XpBridge {
     /// Signature check for bridge actions.
     /// Consumes the passed action_id.
     #[private]
-    fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>, context: &[u8]) {
+    fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>) {
         let f = self.consumed_actions.contains_key(&action_id);
         require!(!f, "Duplicated Action");
 
         self.consumed_actions.insert(action_id, true);
 
-        let mut hasher = Sha512::new();
-        hasher.update(context);
-        hasher.update(data);
-        let hash = hasher.finalize();
-
         let sig = Signature::new(sig_data.as_slice().try_into().unwrap());
         let key = PublicKey::new(self.group_key);
-        let res = key.verify(hash, &sig);
+        let res = key.verify(data, &sig);
         require!(res.is_ok(), "Unauthorized Action");
     }
 
     #[payable]
-    pub fn validate_pause(&mut self, data: PauseData, sig_data: Vec<u8>) {
+    pub fn validate_pause(&mut self, data: PauseData, sig_data: Base64VecU8) {
         require!(!self.paused, "paused");
 
         self.require_sig(
-            data.action_id,
-            data.try_to_vec().unwrap(),
-            sig_data,
-            b"SetPause",
+            data.action_id.into(),
+            sha256(data.try_to_vec().unwrap().as_slice()),
+            sig_data.into(),
         );
 
         self.paused = true;
     }
 
     #[payable]
-    pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Vec<u8>) {
+    pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Base64VecU8) {
         require!(self.paused, "unpaused");
 
         self.require_sig(
-            data.action_id,
-            data.try_to_vec().unwrap(),
-            sig_data,
-            b"SetUnpause",
+            data.action_id.into(),
+            sha256(data.try_to_vec().unwrap().as_slice()),
+            sig_data.into(),
         );
 
         self.paused = false;
     }
 
+    // #[payable]
+    // pub fn validate_withdraw_fees(
+    //     &mut self,
+    //     data: WithdrawFeeData,
+    //     sig_data: Vec<u8>,
+    // ) -> PromiseOrValue<()> {
+    //     require!(!self.paused, "paused");
+
+    //     self.require_sig(
+    //         data.action_id,
+    //         data.try_to_vec().unwrap(),
+    //         sig_data,
+    //         b"WithdrawFees",
+    //     );
+
+    //     let account_id: AccountId = data.account_id.parse().unwrap();
+    //     let public_key = near_sdk::PublicKey::try_from(data.public_key).unwrap();
+    //     // Creating new account. It still can fail (e.g. account already exists or name is invalid),
+    //     // but we don't care, we'll get a refund back.
+    //     Promise::new(account_id)
+    //         .create_account()
+    //         .transfer(env::account_balance() - 10_000_000)
+    //         .add_full_access_key(public_key)
+    //         .into()
+    // }
+
+    // #[payable]
+    // pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
+    //     require!(!self.paused, "paused");
+
+    //     self.require_sig(
+    //         data.action_id,
+    //         data.try_to_vec().unwrap(),
+    //         sig_data,
+    //         b"SetGroupKey",
+    //     );
+
+    //     self.group_key = data.group_key;
+    // }
+
     #[payable]
-    pub fn validate_withdraw_fees(
-        &mut self,
-        data: WithdrawFeeData,
-        sig_data: Vec<u8>,
-    ) -> PromiseOrValue<()> {
+    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Base64VecU8) {
         require!(!self.paused, "paused");
 
         self.require_sig(
-            data.action_id,
-            data.try_to_vec().unwrap(),
-            sig_data,
-            b"WithdrawFees",
-        );
-
-        let account_id: AccountId = data.account_id.parse().unwrap();
-        let public_key = near_sdk::PublicKey::try_from(data.public_key).unwrap();
-        // Creating new account. It still can fail (e.g. account already exists or name is invalid),
-        // but we don't care, we'll get a refund back.
-        Promise::new(account_id)
-            .create_account()
-            .transfer(env::account_balance() - 10_000_000)
-            .add_full_access_key(public_key)
-            .into()
-    }
-
-    #[payable]
-    pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
-        require!(!self.paused, "paused");
-
-        self.require_sig(
-            data.action_id,
-            data.try_to_vec().unwrap(),
-            sig_data,
-            b"SetGroupKey",
-        );
-
-        self.group_key = data.group_key;
-    }
-
-    #[payable]
-    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
-        require!(!self.paused, "paused");
-
-        self.require_sig(
-            data.action_id,
-            data.try_to_vec().unwrap(),
-            sig_data,
-            b"WhitelistNft",
+            data.action_id.into(),
+            sha256(data.try_to_vec().unwrap().as_slice()),
+            sig_data.into(),
         );
 
         self.whitelist.insert(data.mint_with, true);
     }
 
-    /// Transfer foreign NFT. mint wrapped NFT
-    #[payable]
-    pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) {
-        require!(!self.paused, "paused");
+    // /// Transfer foreign NFT. mint wrapped NFT
+    // #[payable]
+    // pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) {
+    //     require!(!self.paused, "paused");
 
-        self.require_sig(
-            data.action_id,
-            data.try_to_vec().unwrap(),
-            sig_data,
-            b"ValidateTransferNft",
-        );
+    //     self.require_sig(
+    //         data.action_id,
+    //         data.try_to_vec().unwrap(),
+    //         sig_data,
+    //         b"ValidateTransferNft",
+    //     );
 
-        xpnft::ext(data.mint_with.parse().unwrap())
-            .with_attached_deposit(near_sdk::ONE_NEAR / 100)
-            .nft_mint(data.token_id, data.owner_id, data.token_metadata);
-    }
+    //     xpnft::ext(data.mint_with.parse().unwrap())
+    //         .with_attached_deposit(near_sdk::ONE_NEAR / 100)
+    //         .nft_mint(data.token_id, data.owner_id, data.token_metadata);
+    // }
 
-    /// Withdraw foreign NFT
-    /// WARN: Even though this contract doesn't check if the burner is trusted,
-    /// we check this in the bridge infrastructure(i.e in the validator)
-    #[payable]
-    pub fn withdraw_nft(
-        &mut self,
-        token_id: TokenId,
-        chain_nonce: u8,
-        to: String,
-        amt: u128,
-        token_contract: AccountId,
-    ) {
-        require!(!self.paused, "paused");
+    // /// Withdraw foreign NFT
+    // /// WARN: Even though this contract doesn't check if the burner is trusted,
+    // /// we check this in the bridge infrastructure(i.e in the validator)
+    // #[payable]
+    // pub fn withdraw_nft(
+    //     &mut self,
+    //     token_id: TokenId,
+    //     chain_nonce: u8,
+    //     to: String,
+    //     amt: u128,
+    //     token_contract: AccountId,
+    // ) {
+    //     require!(!self.paused, "paused");
 
-        xpnft::ext(token_contract.clone())
-            .with_attached_deposit(ONE_YOCTO)
-            .nft_burn(token_id.clone(), env::predecessor_account_id());
+    //     xpnft::ext(token_contract.clone())
+    //         .with_attached_deposit(ONE_YOCTO)
+    //         .nft_burn(token_id.clone(), env::predecessor_account_id());
 
-        Promise::new(env::current_account_id()).transfer(amt);
+    //     Promise::new(env::current_account_id()).transfer(amt);
 
-        self.action_cnt += 1;
-        self.tx_fees += amt;
+    //     self.action_cnt += 1;
+    //     self.tx_fees += amt;
 
-        let unfreeze = events::UnfreezeNftEvent {
-            action_id: self.action_cnt,
-            chain_nonce,
-            to,
-            amt,
-            contract: token_contract,
-            token_id,
-        };
+    //     let unfreeze = events::UnfreezeNftEvent {
+    //         action_id: self.action_cnt,
+    //         chain_nonce,
+    //         to,
+    //         amt,
+    //         contract: token_contract,
+    //         token_id,
+    //     };
 
-        env::log_str(&format!(
-            r#"EVENT_JSON:{{ "type": "UnfreezeUnique", "data": {} }}"#,
-            serde_json::to_string(&unfreeze).unwrap()
-        ))
-    }
+    //     env::log_str(&format!(
+    //         r#"EVENT_JSON:{{ "type": "UnfreezeUnique", "data": {} }}"#,
+    //         serde_json::to_string(&unfreeze).unwrap()
+    //     ))
+    // }
 
-    /// Freeze NEP-171 token.
-    #[payable]
-    pub fn freeze_nft(
-        &mut self,
-        token_id: TokenId,
-        chain_nonce: u8,
-        to: String,
-        amt: u128,
-        mint_with: String,
-        token_contract: AccountId,
-    ) {
-        require!(!self.paused, "paused");
+    // /// Freeze NEP-171 token.
+    // #[payable]
+    // pub fn freeze_nft(
+    //     &mut self,
+    //     token_id: TokenId,
+    //     chain_nonce: u8,
+    //     to: String,
+    //     amt: u128,
+    //     mint_with: String,
+    //     token_contract: AccountId,
+    // ) {
+    //     require!(!self.paused, "paused");
 
-        common_nft::ext(token_contract.clone()).nft_transfer(
-            env::current_account_id(),
-            token_id.clone(),
-            None,
-            None,
-        );
+    //     common_nft::ext(token_contract.clone()).nft_transfer(
+    //         env::current_account_id(),
+    //         token_id.clone(),
+    //         None,
+    //         None,
+    //     );
 
-        Promise::new(env::current_account_id()).transfer(amt);
+    //     Promise::new(env::current_account_id()).transfer(amt);
 
-        self.action_cnt += 1;
-        self.tx_fees += amt;
+    //     self.action_cnt += 1;
+    //     self.tx_fees += amt;
 
-        let transfer = events::TransferNftEvent {
-            action_id: self.action_cnt,
-            chain_nonce,
-            mint_with,
-            to,
-            amt,
-            contract: token_contract,
-            token_id,
-        };
+    //     let transfer = events::TransferNftEvent {
+    //         action_id: self.action_cnt,
+    //         chain_nonce,
+    //         mint_with,
+    //         to,
+    //         amt,
+    //         contract: token_contract,
+    //         token_id,
+    //     };
 
-        env::log_str(&format!(
-            r#"EVENT_JSON:{{ "type": "TransferUnique", "data": {} }}"#,
-            serde_json::to_string(&transfer).unwrap()
-        ))
-    }
+    //     env::log_str(&format!(
+    //         r#"EVENT_JSON:{{ "type": "TransferUnique", "data": {} }}"#,
+    //         serde_json::to_string(&transfer).unwrap()
+    //     ))
+    // }
 
-    /// Unfreeze NEP-171 token.
-    #[payable]
-    pub fn validate_unfreeze_nft(&mut self, data: UnfreezeNftData, sig_data: Vec<u8>) {
-        require!(!self.paused, "paused");
+    // /// Unfreeze NEP-171 token.
+    // #[payable]
+    // pub fn validate_unfreeze_nft(&mut self, data: UnfreezeNftData, sig_data: Vec<u8>) {
+    //     require!(!self.paused, "paused");
 
-        self.require_sig(
-            data.action_id,
-            data.try_to_vec().unwrap(),
-            sig_data,
-            b"ValidateUnfreezeNft",
-        );
+    //     self.require_sig(
+    //         data.action_id,
+    //         data.try_to_vec().unwrap(),
+    //         sig_data,
+    //         b"ValidateUnfreezeNft",
+    //     );
 
-        common_nft::ext(env::current_account_id()).nft_transfer(
-            env::signer_account_id(),
-            data.token_id,
-            None,
-            None,
-        );
-    }
+    //     common_nft::ext(env::current_account_id()).nft_transfer(
+    //         env::signer_account_id(),
+    //         data.token_id,
+    //         None,
+    //         None,
+    //     );
+    // }
 
-    pub fn encode_transfer_action(
-        &self,
-        action_id: u128,
-        mint_with: String,
-        owner_id: AccountId,
-        token_id: String,
-        title: String,
-        description: String,
-        media: String,
-    ) -> Vec<u8> {
-        let data = TransferNftData {
-            action_id,
-            mint_with,
-            owner_id,
-            token_id,
-            token_metadata: TokenMetadata {
-                title: Some(title),
-                description: Some(description),
-                media: Some(media),
-                media_hash: None,
-                copies: None,
-                issued_at: None,
-                expires_at: None,
-                starts_at: None,
-                updated_at: None,
-                extra: None,
-                reference: None,
-                reference_hash: None,
-            },
-        };
-        data.try_to_vec().unwrap()
-    }
+    // pub fn encode_transfer_action(
+    //     &self,
+    //     action_id: u128,
+    //     mint_with: String,
+    //     owner_id: AccountId,
+    //     token_id: String,
+    //     title: String,
+    //     description: String,
+    //     media: String,
+    // ) -> Vec<u8> {
+    //     let data = TransferNftData {
+    //         action_id,
+    //         mint_with,
+    //         owner_id,
+    //         token_id,
+    //         token_metadata: TokenMetadata {
+    //             title: Some(title),
+    //             description: Some(description),
+    //             media: Some(media),
+    //             media_hash: None,
+    //             copies: None,
+    //             issued_at: None,
+    //             expires_at: None,
+    //             starts_at: None,
+    //             updated_at: None,
+    //             extra: None,
+    //             reference: None,
+    //             reference_hash: None,
+    //         },
+    //     };
+    //     data.try_to_vec().unwrap()
+    // }
 
-    pub fn encode_unfreeze_action(&self, action_id: u128, token_id: String) -> Vec<u8> {
-        let event = UnfreezeNftData {
-            action_id,
-            token_id,
-        };
-        event.try_to_vec().unwrap()
-    }
+    // pub fn encode_unfreeze_action(&self, action_id: u128, token_id: String) -> Vec<u8> {
+    //     let event = UnfreezeNftData {
+    //         action_id,
+    //         token_id,
+    //     };
+    //     event.try_to_vec().unwrap()
+    // }
 
     pub fn get_group_key(&self) -> [u8; 32] {
         self.group_key
     }
 
-    pub fn is_paused(&self) -> bool {
-        self.paused
+    pub fn is_whitelist(&self, contract_id: String) -> bool {
+        self.whitelist.contains_key(&contract_id)
     }
+
+    // pub fn is_paused(&self) -> bool {
+    //     self.paused
+    // }
 }
 
 // #[cfg(all(test, not(target_arch = "wasm32")))]

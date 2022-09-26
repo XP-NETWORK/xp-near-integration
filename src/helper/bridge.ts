@@ -1,3 +1,4 @@
+import BN from "bn.js";
 import { Account, Contract } from "near-api-js";
 
 interface InitParam {
@@ -9,17 +10,19 @@ interface InitParam {
 interface WhitelistParam {
     args: {
         data: {
-            action_id: number,
+            action_id: string,
+            contract_id: string,
             mint_with: string,
         },
-        sig_data: number[]
+        sig_data: string
     }
 }
 
 interface BridgeContract extends Contract {
     initialize(param: InitParam): Promise<any>,
-    get_group_key(): Promise<any>,
+    get_group_key(): Promise<number[]>,
     is_paused(): Promise<any>,
+    is_whitelist(param: { contract_id: string }): Promise<boolean>,
     validate_whitelist(param: WhitelistParam): Promise<any>,
 }
 
@@ -35,7 +38,8 @@ export class BridgeHelper {
         this.contract = new Contract(signer, contractId, {
             viewMethods: [
                 "get_group_key",
-                "is_paused"
+                "is_paused",
+                "is_whitelist",
             ],
             changeMethods: [
                 "initialize",
@@ -50,6 +54,10 @@ export class BridgeHelper {
                 "validate_unfreeze_nft"
             ]
         }) as BridgeContract
+    }
+
+    getContractId() {
+        return this.contract.contractId
     }
 
     async getGroupKey() {
@@ -68,15 +76,22 @@ export class BridgeHelper {
         })
     }
 
-    async whitelist(nftContractId: string, actionId: number, signature: Uint8Array) {
+    async whitelist(nftContractId: string, actionId: BN, signature: Uint8Array) {
         return await this.contract.validate_whitelist({
             args: {
                 data: {
-                    action_id: actionId,
+                    action_id: actionId.toString(),
+                    contract_id: this.contract.contractId,
                     mint_with: nftContractId,
                 },
-                sig_data: Array.from(signature)
+                sig_data: Buffer.from(signature).toString("base64")
             }
+        })
+    }
+
+    async isWhitelist(contractId: string) {
+        return await this.contract.is_whitelist({
+            contract_id: contractId
         })
     }
 }
