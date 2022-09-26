@@ -4,7 +4,7 @@ import BN from "bn.js"
 export class WhitelistData {
     @field({ type: "u128" })
     actionId: BN;
-    @field({ type: "String" })
+    @field({ type: "string" })
     mintWith: string;
 
     constructor(actionId: BN, mintWith: string) {

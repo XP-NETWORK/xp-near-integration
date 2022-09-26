@@ -3,35 +3,13 @@ use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{
-    env, ext_contract, near_bindgen, require, AccountId, Promise, PromiseOrValue, ONE_YOCTO,
-};
+use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseOrValue, ONE_YOCTO};
 use sha2::{Digest, Sha512};
 
 use std::collections::HashMap;
 mod events;
-#[ext_contract(ext_xp_nft)]
-pub trait ExtXpNft {
-    fn nft_mint(
-        &mut self,
-        token_id: TokenId,
-        token_owner_id: AccountId,
-        token_metadata: TokenMetadata,
-    ) -> Promise;
-
-    fn nft_burn(&mut self, token_id: TokenId, token_owner_id: AccountId) -> Promise;
-}
-
-#[ext_contract(ext_nft)]
-pub trait ExtNft {
-    fn nft_transfer(
-        &mut self,
-        receiver_id: AccountId,
-        token_id: TokenId,
-        approval_id: Option<u64>,
-        memo: Option<String>,
-    ) -> Promise;
-}
+pub mod external;
+pub use crate::external::*;
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
@@ -99,6 +77,8 @@ pub struct XpBridge {
 impl XpBridge {
     #[init]
     pub fn initialize(group_key: [u8; 32]) -> Self {
+        assert!(env::current_account_id() == env::predecessor_account_id(), "Unauthorized");
+
         Self {
             consumed_actions: HashMap::new(),
             paused: false,
@@ -224,7 +204,7 @@ impl XpBridge {
             b"ValidateTransferNft",
         );
 
-        ext_xp_nft::ext(data.mint_with.parse().unwrap())
+        xpnft::ext(data.mint_with.parse().unwrap())
             .with_attached_deposit(near_sdk::ONE_NEAR / 100)
             .nft_mint(data.token_id, data.owner_id, data.token_metadata);
     }
@@ -243,7 +223,7 @@ impl XpBridge {
     ) {
         require!(!self.paused, "paused");
 
-        ext_xp_nft::ext(token_contract.clone())
+        xpnft::ext(token_contract.clone())
             .with_attached_deposit(ONE_YOCTO)
             .nft_burn(token_id.clone(), env::predecessor_account_id());
 
@@ -280,7 +260,7 @@ impl XpBridge {
     ) {
         require!(!self.paused, "paused");
 
-        ext_nft::ext(token_contract.clone()).nft_transfer(
+        common_nft::ext(token_contract.clone()).nft_transfer(
             env::current_account_id(),
             token_id.clone(),
             None,
@@ -320,7 +300,7 @@ impl XpBridge {
             b"ValidateUnfreezeNft",
         );
 
-        ext_nft::ext(env::current_account_id()).nft_transfer(
+        common_nft::ext(env::current_account_id()).nft_transfer(
             env::signer_account_id(),
             data.token_id,
             None,

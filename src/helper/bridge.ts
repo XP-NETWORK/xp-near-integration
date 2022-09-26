@@ -31,8 +31,8 @@ export interface NearProvider {
 export class BridgeHelper {
     private contract: BridgeContract
 
-    constructor(provider: NearProvider) {
-        this.contract = new Contract(provider.account, provider.contractId, {
+    constructor(signer: Account, contractId: string) {
+        this.contract = new Contract(signer, contractId, {
             viewMethods: [
                 "get_group_key",
                 "is_paused"
