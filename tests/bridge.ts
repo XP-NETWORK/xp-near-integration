@@ -19,11 +19,10 @@ describe("bridge", async () => {
     let worker: Worker;
     let nearConnection: Near;
 
+    let xpnftAcc: Account;
+    let bridgeAcc: Account;
     let collectionOwnerAcc: Account;
     let nftOwnerAcc: Account;
-
-    let xpnftContract: XpnftHelper;
-    let bridgeContract: BridgeHelper;
 
     let pk: Uint8Array;
     let sk: Uint8Array;
@@ -64,19 +63,19 @@ describe("bridge", async () => {
             headers: {},
         });
 
-        const xpnftAcc = await nearConnection.account(xpnft.accountId);
+        xpnftAcc = await nearConnection.account(xpnft.accountId);
         await xpnftAcc.deployContract(
             fs.readFileSync(
                 __dirname +
-                    "/../contract/target/wasm32-unknown-unknown/release/xpnft.wasm"
+                "/../contract/target/wasm32-unknown-unknown/release/xpnft.wasm"
             )
         );
 
-        const bridgeAcc = await nearConnection.account(xpbridge.accountId);
+        bridgeAcc = await nearConnection.account(xpbridge.accountId);
         await bridgeAcc.deployContract(
             fs.readFileSync(
                 __dirname +
-                    "/../contract/target/wasm32-unknown-unknown/release/xpbridge.wasm"
+                "/../contract/target/wasm32-unknown-unknown/release/xpbridge.wasm"
             )
         );
 
@@ -85,15 +84,15 @@ describe("bridge", async () => {
         );
         nftOwnerAcc = await nearConnection.account(nftOwner.accountId);
 
-        xpnftContract = new XpnftHelper(collectionOwnerAcc, xpnft.accountId);
-        bridgeContract = new BridgeHelper(bridgeAcc, xpbridge.accountId);
-
         sk = ed.utils.randomPrivateKey();
         pk = await ed.getPublicKey(sk);
     });
 
     it("initialize xpnft", async () => {
-        await xpnftContract.initialize(collectionOwnerAcc.accountId, {
+        const xpnftHelper = new XpnftHelper(xpnftAcc.accountId, collectionOwnerAcc);
+        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
+
+        await xpnftHelper.initialize(bridgeHelper.getContractId(), {
             spec: "nft-1.0.0",
             name: "xpnft",
             symbol: "XPNFT",
@@ -105,106 +104,100 @@ describe("bridge", async () => {
     });
 
     it("initialize bridge", async () => {
-        await bridgeContract.initialize(pk);
+        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
 
-        const storedPk = await bridgeContract.getGroupKey();
+        await bridgeHelper.initialize(pk);
+
+        const storedPk = await bridgeHelper.getGroupKey();
         assert.ok(Buffer.from(pk).equals(Buffer.from(storedPk)));
     });
 
     it("whitelist nft", async () => {
+        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
+
         const actionId = new BN(0);
         const data = new WhitelistData({
             actionId,
-            mintWith: xpnftContract.getContractId(),
+            mintWith: xpnftAcc.accountId,
         });
         const message = serialize(data);
         const msgHash = createHash("SHA256").update(message).digest();
         const signature = await ed.sign(msgHash, sk);
-        await bridgeContract.whitelist(
-            xpnftContract.getContractId(),
-            actionId,
-            signature
-        );
+        await bridgeHelper.whitelist(data, signature);
 
-        const flag = await bridgeContract.isWhitelist(
-            xpnftContract.getContractId()
+        const flag = await bridgeHelper.isWhitelist(
+            xpnftAcc.accountId
         );
         assert.ok(flag);
     });
 
     it("pause bridge", async () => {
+        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
+
         const actionId = new BN(1);
         const data = new PauseData({ actionId });
         const message = serialize(data);
         const msgHash = createHash("SHA256").update(message).digest();
         const signature = await ed.sign(msgHash, sk);
-        await bridgeContract.pause(actionId, signature);
+        await bridgeHelper.pause(data, signature);
 
-        const flag = await bridgeContract.isPaused();
+        const flag = await bridgeHelper.isPaused();
         assert.ok(flag);
     });
 
     it("unpause bridge", async () => {
+        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
+
         const actionId = new BN(2);
         const data = new UnpauseData({ actionId });
         const message = serialize(data);
         const msgHash = createHash("SHA256").update(message).digest();
         const signature = await ed.sign(msgHash, sk);
-        await bridgeContract.unpause(actionId, signature);
+        await bridgeHelper.unpause(data, signature);
 
-        const flag = await bridgeContract.isPaused();
+        const flag = await bridgeHelper.isPaused();
         assert.ok(!flag);
     });
 
-    it("transfer nft", async () => {
+    it("transfer nft:0", async () => {
+        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
+
         const actionId = new BN(3);
         const data = new TransferNftData({
             actionId,
-            mintWith: xpnftContract.getContractId(),
+            mintWith: xpnftAcc.accountId,
             tokenId: "0",
             tokenOwnerId: nftOwnerAcc.accountId,
             tokenMetadata: new TokenMetadataData({
                 title: "Olympus Mons",
                 description: "The tallest mountain in the charted solar system",
                 media: null,
-                media_hash: null,
+                mediaHash: null,
                 copies: 10000,
-                issued_at: null,
-                expires_at: null,
-                starts_at: null,
-                updated_at: null,
+                issuedAt: null,
+                expiresAt: null,
+                startsAt: null,
+                updatedAt: null,
                 extra: null,
                 reference: null,
-                reference_hash: null,
+                referenceHash: null,
             }),
         });
         const message = serialize(data);
         const msgHash = createHash("SHA256").update(message).digest();
 
         const signature = await ed.sign(msgHash, sk);
-        const res = await bridgeContract.transferNft(
-            actionId,
-            xpnftContract.getContractId(),
-            new BN(0),
-            nftOwnerAcc.accountId,
-            {
-                title: "Olympus Mons",
-                description: "The tallest mountain in the charted solar system",
-                media: null,
-                media_hash: null,
-                copies: 10000,
-                issued_at: null,
-                expires_at: null,
-                starts_at: null,
-                updated_at: null,
-                extra: null,
-                reference: null,
-                reference_hash: null,
-            },
-            signature
-        );
-        console.log(res)
+        const res = await bridgeHelper.transferNft(data, signature);
+        console.log(res);
     });
+
+    it("withdraw nft:0", async () => {
+        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, nftOwnerAcc);
+        const chainNonce = 0
+        const to = "example_address"
+        const amt = new BN(1_000_000_000_000)
+        await bridgeHelper.withdrawNft(xpnftAcc.accountId, "0", chainNonce, to, amt)
+    })
 
     after(async () => {
         await worker.tearDown().catch((error) => {

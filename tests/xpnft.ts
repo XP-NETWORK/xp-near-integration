@@ -51,7 +51,7 @@ describe("xpnft", async () => {
             collectionOwner.accountId
         );
         nftOwnerAcc = await nearConnection.account(nftOwner.accountId);
-        xpnftContract = new XpnftHelper(collectionOwnerAcc, xpnft.accountId);
+        xpnftContract = new XpnftHelper(xpnft.accountId, collectionOwnerAcc);
     });
 
     it("initialize collection", async () => {

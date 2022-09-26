@@ -1,6 +1,8 @@
 use near_contract_standards::non_fungible_token::{metadata::TokenMetadata, Token, TokenId};
 use near_sdk::{ext_contract, AccountId, Promise};
 
+pub const TYOCTO: u128 = 1_000_000_000_000;
+
 #[ext_contract(xpnft)]
 pub trait XpNft {
     fn nft_mint(

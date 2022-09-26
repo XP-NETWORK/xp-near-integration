@@ -52,23 +52,23 @@ export class TokenMetadataData {
     @field({ type: option("string") })
     media: string | undefined;
     @field({ type: option(vec("u8")) })
-    media_hash: Uint8Array | undefined;
+    mediaHash: Uint8Array | undefined;
     @field({ type: option("u64") })
     copies: number | undefined;
     @field({ type: option("string") })
-    issued_at: string | undefined;
+    issuedAt: string | undefined;
     @field({ type: option("string") })
-    expires_at: string | undefined;
+    expiresAt: string | undefined;
     @field({ type: option("string") })
-    starts_at: string | undefined;
+    startsAt: string | undefined;
     @field({ type: option("string") })
-    updated_at: string | undefined;
+    updatedAt: string | undefined;
     @field({ type: option("string") })
     extra: string | undefined;
     @field({ type: option("string") })
     reference: string | undefined;
     @field({ type: option(vec("u8")) })
-    reference_hash: Uint8Array | undefined;
+    referenceHash: Uint8Array | undefined;
 
     constructor(data: TokenMetadataData) {
         Object.assign(this, data);

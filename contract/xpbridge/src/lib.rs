@@ -5,13 +5,12 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::env::sha256;
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{
-    env, near_bindgen, require, AccountId, Promise, PromiseError, PromiseOrValue, ONE_YOCTO,
-};
+use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseError};
 
 use std::collections::HashMap;
-mod events;
+pub mod events;
 pub mod external;
+pub use crate::events::*;
 pub use crate::external::*;
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -210,61 +209,67 @@ impl XpBridge {
         );
 
         xpnft::ext(data.mint_with)
-            .with_attached_deposit(near_sdk::ONE_NEAR / 100)
+            .with_attached_deposit(6_150_000_000 * TYOCTO)
             .nft_mint(data.token_id, data.owner_id, data.token_metadata)
-            .then(Self::ext(env::current_account_id()).transfer_nft_callback())
+    }
+
+    /// Withdraw foreign NFT
+    /// WARN: Even though this contract doesn't check if the burner is trusted,
+    /// we check this in the bridge infrastructure(i.e in the validator)
+    #[payable]
+    pub fn withdraw_nft(
+        &mut self,
+        token_contract: AccountId,
+        token_id: TokenId,
+        chain_nonce: u8,
+        to: String,
+        amt: U128,
+    ) -> Promise {
+        require!(!self.paused, "paused");
+
+        require!(
+            self.whitelist
+                .contains_key(&token_contract.clone().to_string()),
+            "Not whitelist"
+        );
+
+        xpnft::ext(token_contract.clone())
+            .nft_burn(token_id.clone(), env::predecessor_account_id())
+            .then(Promise::new(env::current_account_id()).transfer(amt.into()))
+            .then(Self::ext(env::current_account_id()).withdraw_callback(
+                token_contract,
+                token_id,
+                chain_nonce,
+                to,
+                amt.into(),
+            ))
     }
 
     #[private]
-    pub fn transfer_nft_callback(
-        &self,
+    pub fn withdraw_callback(
+        &mut self,
+        token_contract: AccountId,
+        token_id: TokenId,
+        chain_nonce: u8,
+        to: String,
+        amt: u128,
         #[callback_result] call_result: Result<(), PromiseError>,
-    ) -> bool {
-        // Return whether or not the promise succeeded using the method outlined in external.rs
-        if call_result.is_err() {
-            return false;
-        } else {
-            return true;
+    ) {
+        require!(call_result.is_ok(), "withdraw failed");
+
+        self.action_cnt += 1;
+        self.tx_fees += amt;
+
+        UnfreezeNftEvent {
+            action_id: self.action_cnt,
+            chain_nonce,
+            to,
+            amt,
+            contract: token_contract,
+            token_id,
         }
+        .emit();
     }
-
-    // /// Withdraw foreign NFT
-    // /// WARN: Even though this contract doesn't check if the burner is trusted,
-    // /// we check this in the bridge infrastructure(i.e in the validator)
-    // #[payable]
-    // pub fn withdraw_nft(
-    //     &mut self,
-    //     token_id: TokenId,
-    //     chain_nonce: u8,
-    //     to: String,
-    //     amt: u128,
-    //     token_contract: AccountId,
-    // ) {
-    //     require!(!self.paused, "paused");
-
-    //     xpnft::ext(token_contract.clone())
-    //         .with_attached_deposit(ONE_YOCTO)
-    //         .nft_burn(token_id.clone(), env::predecessor_account_id());
-
-    //     Promise::new(env::current_account_id()).transfer(amt);
-
-    //     self.action_cnt += 1;
-    //     self.tx_fees += amt;
-
-    //     let unfreeze = events::UnfreezeNftEvent {
-    //         action_id: self.action_cnt,
-    //         chain_nonce,
-    //         to,
-    //         amt,
-    //         contract: token_contract,
-    //         token_id,
-    //     };
-
-    //     env::log_str(&format!(
-    //         r#"EVENT_JSON:{{ "type": "UnfreezeUnique", "data": {} }}"#,
-    //         serde_json::to_string(&unfreeze).unwrap()
-    //     ))
-    // }
 
     // /// Freeze NEP-171 token.
     // #[payable]
@@ -325,47 +330,6 @@ impl XpBridge {
     //         None,
     //         None,
     //     );
-    // }
-
-    // pub fn encode_transfer_action(
-    //     &self,
-    //     action_id: u128,
-    //     mint_with: String,
-    //     owner_id: AccountId,
-    //     token_id: String,
-    //     title: String,
-    //     description: String,
-    //     media: String,
-    // ) -> Vec<u8> {
-    //     let data = TransferNftData {
-    //         action_id,
-    //         mint_with,
-    //         owner_id,
-    //         token_id,
-    //         token_metadata: TokenMetadata {
-    //             title: Some(title),
-    //             description: Some(description),
-    //             media: Some(media),
-    //             media_hash: None,
-    //             copies: None,
-    //             issued_at: None,
-    //             expires_at: None,
-    //             starts_at: None,
-    //             updated_at: None,
-    //             extra: None,
-    //             reference: None,
-    //             reference_hash: None,
-    //         },
-    //     };
-    //     data.try_to_vec().unwrap()
-    // }
-
-    // pub fn encode_unfreeze_action(&self, action_id: u128, token_id: String) -> Vec<u8> {
-    //     let event = UnfreezeNftData {
-    //         action_id,
-    //         token_id,
-    //     };
-    //     event.try_to_vec().unwrap()
     // }
 
     pub fn get_group_key(&self) -> [u8; 32] {

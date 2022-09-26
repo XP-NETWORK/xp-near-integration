@@ -41,7 +41,7 @@ interface MintParam {
     amount: string;
 }
 
-interface Token {
+export interface Token {
     token_id: string;
     owner_id: string;
     metadata: TokenMetadata;
@@ -65,7 +65,7 @@ interface XpnftContract extends Contract {
 export class XpnftHelper {
     private contract: XpnftContract;
 
-    constructor(signer: Account, contractId: string) {
+    constructor(contractId: string, signer: Account) {
         this.contract = new Contract(signer, contractId, {
             viewMethods: ["nft_token"],
             changeMethods: ["initialize", "nft_mint", "nft_burn"],

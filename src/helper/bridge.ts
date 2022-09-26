@@ -1,6 +1,12 @@
 import BN from "bn.js";
 import { Account, Contract } from "near-api-js";
-import { TokenMetadata } from "./xpnft";
+import {
+    PauseData,
+    TransferNftData,
+    UnpauseData,
+    WhitelistData,
+} from "../encode";
+import { Token, TokenMetadata } from "./xpnft";
 
 interface InitParam {
     args: {
@@ -50,6 +56,16 @@ interface TransferNftParam {
     };
 }
 
+interface WithdrawNftParam {
+    args: {
+        token_contract: string,
+        token_id: string,
+        chain_nonce: number,
+        to: string,
+        amt: string,
+    }
+}
+
 interface BridgeContract extends Contract {
     initialize(param: InitParam): Promise<any>;
     get_group_key(): Promise<number[]>;
@@ -58,7 +74,8 @@ interface BridgeContract extends Contract {
     validate_whitelist(param: WhitelistParam): Promise<void>;
     validate_pause(param: PauseParam): Promise<void>;
     validate_unpause(param: UnpauseParam): Promise<void>;
-    validate_transfer_nft(param: TransferNftParam): Promise<any>;
+    validate_transfer_nft(param: TransferNftParam): Promise<Token>;
+    withdraw_nft(param: WithdrawNftParam): Promise<any>;
 }
 
 export interface NearProvider {
@@ -69,7 +86,7 @@ export interface NearProvider {
 export class BridgeHelper {
     private contract: BridgeContract;
 
-    constructor(signer: Account, contractId: string) {
+    constructor(contractId: string, signer: Account) {
         this.contract = new Contract(signer, contractId, {
             viewMethods: ["get_group_key", "is_paused", "is_whitelist"],
             changeMethods: [
@@ -113,64 +130,78 @@ export class BridgeHelper {
         });
     }
 
-    async whitelist(
-        nftContractId: string,
-        actionId: BN,
-        signature: Uint8Array
-    ) {
+    async whitelist(data: WhitelistData, signature: Uint8Array) {
         return await this.contract.validate_whitelist({
             args: {
                 data: {
-                    action_id: actionId.toString(),
+                    action_id: data.actionId.toString(),
                     contract_id: this.contract.contractId,
-                    mint_with: nftContractId,
+                    mint_with: data.mintWith,
                 },
                 sig_data: Buffer.from(signature).toString("base64"),
             },
         });
     }
 
-    async pause(actionId: BN, signature: Uint8Array) {
+    async pause(data: PauseData, signature: Uint8Array) {
         return await this.contract.validate_pause({
             args: {
                 data: {
-                    action_id: actionId.toString(),
+                    action_id: data.actionId.toString(),
                 },
                 sig_data: Buffer.from(signature).toString("base64"),
             },
         });
     }
 
-    async unpause(actionId: BN, signature: Uint8Array) {
+    async unpause(data: UnpauseData, signature: Uint8Array) {
         return await this.contract.validate_unpause({
             args: {
                 data: {
-                    action_id: actionId.toString(),
+                    action_id: data.actionId.toString(),
                 },
                 sig_data: Buffer.from(signature).toString("base64"),
             },
         });
     }
 
-    async transferNft(
-        actionId: BN,
-        mintWith: string,
-        tokenId: BN,
-        ownerId: string,
-        metadata: TokenMetadata,
-        signature: Uint8Array
-    ) {
+    async transferNft(data: TransferNftData, signature: Uint8Array) {
         return await this.contract.validate_transfer_nft({
             args: {
                 data: {
-                    action_id: actionId.toString(),
-                    mint_with: mintWith,
-                    token_id: tokenId.toString(),
-                    owner_id: ownerId,
-                    token_metadata: metadata,
+                    action_id: data.actionId.toString(),
+                    mint_with: data.mintWith,
+                    token_id: data.tokenId,
+                    owner_id: data.tokenOwnerId,
+                    token_metadata: {
+                        title: data.tokenMetadata.title,
+                        description: data.tokenMetadata.description,
+                        media: data.tokenMetadata.media,
+                        media_hash: data.tokenMetadata.mediaHash,
+                        copies: data.tokenMetadata.copies,
+                        issued_at: data.tokenMetadata.issuedAt,
+                        expires_at: data.tokenMetadata.expiresAt,
+                        starts_at: data.tokenMetadata.startsAt,
+                        updated_at: data.tokenMetadata.updatedAt,
+                        extra: data.tokenMetadata.extra,
+                        reference: data.tokenMetadata.reference,
+                        reference_hash: data.tokenMetadata.referenceHash
+                    },
                 },
                 sig_data: Buffer.from(signature).toString("base64"),
             },
         });
+    }
+
+    async withdrawNft(collection: string, tokenId: string, chainNoce: number, to: string, amt: BN) {
+        return await this.contract.withdraw_nft({
+            args: {
+                token_contract: collection,
+                token_id: tokenId,
+                chain_nonce: chainNoce,
+                to,
+                amt: amt.toString()
+            }
+        })
     }
 }
