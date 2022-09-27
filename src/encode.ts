@@ -5,7 +5,7 @@ export class WhitelistData {
     @field({ type: "u128" })
     actionId: BN;
     @field({ type: "string" })
-    mintWith: string;
+    tokenContract: string;
 
     constructor(data: WhitelistData) {
         Object.assign(this, data);

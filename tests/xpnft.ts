@@ -6,9 +6,11 @@ import { XpnftHelper } from "../src/helper";
 describe("xpnft", async () => {
     let worker: Worker;
     let nearConnection: Near;
+
+    let xpnftAcc: Account;
     let collectionOwnerAcc: Account;
     let nftOwnerAcc: Account;
-    let xpnftContract: XpnftHelper;
+    let bobAcc: Account;
 
     before(async () => {
         // Init the worker and start a Sandbox server
@@ -18,6 +20,7 @@ describe("xpnft", async () => {
         const xpnft = await root.createSubAccount("xpnft");
         const collectionOwner = await root.createSubAccount("owner");
         const nftOwner = await root.createSubAccount("nft-owner");
+        const bob = await root.createSubAccount("bob")
 
         const myKeyStore = new keyStores.InMemoryKeyStore();
         await myKeyStore.setKey("local", xpnft.accountId, await xpnft.getKey());
@@ -31,6 +34,11 @@ describe("xpnft", async () => {
             nftOwner.accountId,
             await nftOwner.getKey()
         );
+        await myKeyStore.setKey(
+            "local",
+            bob.accountId,
+            await bob.getKey()
+        )
 
         nearConnection = await connect({
             networkId: "local",
@@ -39,7 +47,7 @@ describe("xpnft", async () => {
             headers: {},
         });
 
-        const xpnftAcc = await nearConnection.account(xpnft.accountId);
+        xpnftAcc = await nearConnection.account(xpnft.accountId);
         await xpnftAcc.deployContract(
             fs.readFileSync(
                 __dirname +
@@ -51,11 +59,12 @@ describe("xpnft", async () => {
             collectionOwner.accountId
         );
         nftOwnerAcc = await nearConnection.account(nftOwner.accountId);
-        xpnftContract = new XpnftHelper(xpnft.accountId, collectionOwnerAcc);
+        bobAcc = await nearConnection.account(bob.accountId)
     });
 
     it("initialize collection", async () => {
-        await xpnftContract.initialize(collectionOwnerAcc.accountId, {
+        const xpnftHelper = new XpnftHelper(xpnftAcc.accountId, collectionOwnerAcc);
+        await xpnftHelper.initialize(collectionOwnerAcc.accountId, {
             spec: "nft-1.0.0",
             name: "xpnft",
             symbol: "XPNFT",
@@ -67,7 +76,9 @@ describe("xpnft", async () => {
     });
 
     it("mint NFT:0", async () => {
-        await xpnftContract.mint("0", nftOwnerAcc.accountId, {
+        const xpnftHelper = new XpnftHelper(xpnftAcc.accountId, collectionOwnerAcc);
+
+        await xpnftHelper.mint("0", nftOwnerAcc.accountId, {
             title: "Olympus Mons",
             description: "The tallest mountain in the charted solar system",
             media: null,
@@ -83,8 +94,14 @@ describe("xpnft", async () => {
         });
     });
 
+    it("transfer NFT:0", async () => {
+        const xpnftHelper = new XpnftHelper(xpnftAcc.accountId, nftOwnerAcc);
+        await xpnftHelper.transfer(bobAcc.accountId, "0")
+    })
+
     it("burn NFT:0", async () => {
-        await xpnftContract.burn("0", nftOwnerAcc.accountId);
+        const xpnftHelper = new XpnftHelper(xpnftAcc.accountId, collectionOwnerAcc);
+        await xpnftHelper.burn("0", bobAcc.accountId);
     });
 
     after(async () => {

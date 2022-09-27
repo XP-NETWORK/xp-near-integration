@@ -242,7 +242,7 @@ impl XpBridge {
         );
 
         xpnft::ext(data.mint_with)
-            .with_attached_deposit(6_150_000_000 * TYOCTO)
+            .with_attached_deposit(env::attached_deposit())
             .nft_mint(data.token_id, data.owner_id, data.token_metadata)
     }
 
@@ -268,7 +268,6 @@ impl XpBridge {
 
         xpnft::ext(token_contract.clone())
             .nft_burn(token_id.clone(), env::predecessor_account_id())
-            .then(Promise::new(env::current_account_id()).transfer(amt.into()))
             .then(Self::ext(env::current_account_id()).withdraw_callback(
                 token_contract,
                 token_id,
@@ -287,7 +286,7 @@ impl XpBridge {
         to: String,
         amt: u128,
         #[callback_result] call_result: Result<(), PromiseError>,
-    ) {
+    ) -> Promise {
         require!(call_result.is_ok(), "withdraw failed");
 
         self.action_cnt += 1;
@@ -302,6 +301,8 @@ impl XpBridge {
             token_id,
         }
         .emit();
+
+        Promise::new(env::current_account_id()).transfer(amt.into())
     }
 
     /// Freeze NEP-171 token.
@@ -318,8 +319,8 @@ impl XpBridge {
         require!(!self.paused, "paused");
 
         common_nft::ext(token_contract.clone())
+            .with_attached_deposit(1)
             .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
-            .then(Promise::new(env::current_account_id()).transfer(amt.into()))
             .then(Self::ext(env::current_account_id()).freeze_callback(
                 token_contract,
                 token_id,
@@ -340,8 +341,8 @@ impl XpBridge {
         mint_with: String,
         amt: u128,
         #[callback_result] call_result: Result<(), PromiseError>,
-    ) {
-        require!(call_result.is_ok(), "withdraw failed");
+    ) -> Promise {
+        require!(call_result.is_ok(), "freeze failed");
 
         self.action_cnt += 1;
         self.tx_fees += amt;
@@ -356,6 +357,8 @@ impl XpBridge {
             mint_with,
         }
         .emit();
+
+        Promise::new(env::current_account_id()).transfer(amt.into())
     }
 
     /// Unfreeze NEP-171 token.
@@ -391,5 +394,9 @@ impl XpBridge {
 
     pub fn is_paused(&self) -> bool {
         self.paused
+    }
+
+    pub fn get_action_id(&self) -> U128 {
+        U128(self.action_cnt)
     }
 }

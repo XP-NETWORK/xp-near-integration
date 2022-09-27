@@ -7,7 +7,6 @@
     "build": "npm run build:contract",
     "build:contract": "cd contract && ./build.sh",
     "test": "npm run build:contract && npm run test:integration",
-    "test:unit": "cd contract && cargo test",
     "test:integration": "ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
