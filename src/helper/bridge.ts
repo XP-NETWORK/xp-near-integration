@@ -63,7 +63,8 @@ interface WithdrawNftParam {
         chain_nonce: number;
         to: string;
         amt: string;
-    };
+    },
+    gas: number
 }
 
 interface FreezeNftParam {
@@ -226,6 +227,7 @@ export class BridgeHelper {
                 to,
                 amt: amt.toString(),
             },
+            gas: 300_000_000_000_000
         });
     }
 

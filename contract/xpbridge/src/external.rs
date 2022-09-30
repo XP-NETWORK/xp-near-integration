@@ -2,6 +2,7 @@ use near_contract_standards::non_fungible_token::{metadata::TokenMetadata, Token
 use near_sdk::{ext_contract, AccountId, Promise};
 
 pub const TYOCTO: u128 = 1_000_000_000_000;
+pub const TGAS: u64 = 1_000_000_000_000;
 
 #[ext_contract(xpnft)]
 pub trait XpNft {
@@ -13,6 +14,8 @@ pub trait XpNft {
     ) -> Token;
 
     fn nft_burn(&mut self, token_id: TokenId, from: AccountId) -> Promise;
+
+    fn nft_token(&self, token_id: TokenId) -> Option<Token>;
 }
 
 #[ext_contract(common_nft)]

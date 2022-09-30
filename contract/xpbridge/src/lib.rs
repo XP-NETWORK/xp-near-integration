@@ -1,6 +1,7 @@
 use ed25519_compact::{PublicKey, Signature};
 use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::TokenId;
+use near_contract_standards::non_fungible_token::Token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::env::sha256;
 use near_sdk::json_types::{Base64VecU8, U128};
@@ -267,10 +268,35 @@ impl XpBridge {
         );
 
         xpnft::ext(token_contract.clone())
-            .nft_burn(token_id.clone(), env::predecessor_account_id())
-            .then(Self::ext(env::current_account_id()).withdraw_callback(
+            .nft_token(token_id.clone())
+            .then(Self::ext(env::current_account_id()).token_callback(
                 token_contract,
                 token_id,
+                env::predecessor_account_id(),
+                chain_nonce,
+                to,
+                amt.into(),
+            ))
+    }
+
+    #[private]
+    pub fn token_callback(
+        &mut self,
+        token_contract: AccountId,
+        token_id: TokenId,
+        owner_id: AccountId,
+        chain_nonce: u8,
+        to: String,
+        amt: u128,
+        #[callback_result] call_result: Result<Option<Token>, PromiseError>,
+    ) -> Promise {
+        require!(call_result.is_ok(), "token callback failed");
+
+        xpnft::ext(token_contract.clone())
+            .nft_burn(token_id.clone(), owner_id)
+            .then(Self::ext(env::current_account_id()).withdraw_callback(
+                token_contract,
+                call_result.unwrap(),
                 chain_nonce,
                 to,
                 amt.into(),
@@ -281,7 +307,7 @@ impl XpBridge {
     pub fn withdraw_callback(
         &mut self,
         token_contract: AccountId,
-        token_id: TokenId,
+        token: Option<Token>,
         chain_nonce: u8,
         to: String,
         amt: u128,
@@ -298,7 +324,7 @@ impl XpBridge {
             to,
             amt,
             contract: token_contract,
-            token_id,
+            token,
         }
         .emit();
 

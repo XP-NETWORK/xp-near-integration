@@ -1,4 +1,4 @@
-use near_contract_standards::non_fungible_token::TokenId;
+use near_contract_standards::non_fungible_token::{Token, TokenId};
 use near_sdk::{
     env,
     serde::{Deserialize, Serialize},
@@ -41,7 +41,7 @@ pub struct UnfreezeNftEvent {
     pub to: String,
     pub action_id: u128,
     pub amt: u128,
-    pub token_id: TokenId,
+    pub token: Option<Token>,
     pub contract: AccountId,
 }
 
