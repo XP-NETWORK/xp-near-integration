@@ -7,7 +7,7 @@ use near_sdk::env::sha256;
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseError};
-
+use sha2::{Digest, Sha512};
 use std::collections::HashMap;
 pub mod events;
 pub mod external;
@@ -101,15 +101,20 @@ impl XpBridge {
     /// Signature check for bridge actions.
     /// Consumes the passed action_id.
     #[private]
-    fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>) {
+    fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>, context: &[u8]) {
         let f = self.consumed_actions.contains_key(&action_id);
         require!(!f, "Duplicated Action");
 
         self.consumed_actions.insert(action_id, true);
 
+        let mut hasher = Sha512::new();
+        hasher.update(context);
+        hasher.update(data);
+        let hash = hasher.finalize();
+
         let sig = Signature::new(sig_data.as_slice().try_into().unwrap());
         let key = PublicKey::new(self.group_key);
-        let res = key.verify(data, &sig);
+        let res = key.verify(hash, &sig);
         require!(res.is_ok(), "Unauthorized Action");
     }
 
@@ -121,6 +126,7 @@ impl XpBridge {
             data.action_id.into(),
             sha256(data.try_to_vec().unwrap().as_slice()),
             sig_data.into(),
+            b"SetPause",
         );
 
         self.paused = true;
@@ -134,6 +140,7 @@ impl XpBridge {
             data.action_id.into(),
             sha256(data.try_to_vec().unwrap().as_slice()),
             sig_data.into(),
+            b"SetUnpause",
         );
 
         self.paused = false;
@@ -151,6 +158,7 @@ impl XpBridge {
             data.action_id.into(),
             data.try_to_vec().unwrap(),
             sig_data.into(),
+            b"WithdrawFees",
         );
 
         let storage_used = env::storage_usage();
@@ -178,6 +186,7 @@ impl XpBridge {
             data.action_id.into(),
             sha256(data.try_to_vec().unwrap().as_slice()),
             sig_data.into(),
+            b"SetGroupKey",
         );
 
         self.group_key = data.group_key;
@@ -198,6 +207,7 @@ impl XpBridge {
             data.action_id.into(),
             sha256(data.try_to_vec().unwrap().as_slice()),
             sig_data.into(),
+            b"WhitelistNft",
         );
 
         self.whitelist.insert(data.token_contract, true);
@@ -217,6 +227,7 @@ impl XpBridge {
             data.action_id.into(),
             sha256(data.try_to_vec().unwrap().as_slice()),
             sig_data.into(),
+            b"ValidateBlacklistNft"
         );
 
         self.whitelist.remove(&data.token_contract);
@@ -240,6 +251,7 @@ impl XpBridge {
             data.action_id.into(),
             sha256(data.try_to_vec().unwrap().as_slice()),
             sig_data.into(),
+            b"ValidateTransferNft",
         );
 
         xpnft::ext(data.mint_with)
@@ -400,6 +412,7 @@ impl XpBridge {
             data.action_id.into(),
             data.try_to_vec().unwrap(),
             sig_data.into(),
+            b"ValidateUnfreezeNft",
         );
 
         common_nft::ext(data.token_contract).nft_transfer(
@@ -409,6 +422,51 @@ impl XpBridge {
             None,
         )
     }
+
+    pub fn encode_transfer_action(
+        &self,
+        action_id: U128,
+        mint_with: AccountId,
+        owner_id: AccountId,
+        token_id: String,
+        title: String,
+        description: String,
+        media: String,
+        extra: String
+    ) -> Vec<u8> {
+        let data = TransferNftData {
+            action_id,
+            mint_with,
+            owner_id,
+            token_id,
+            token_metadata: TokenMetadata {
+                title: Some(title),
+                description: Some(description),
+                media: Some(media),
+                media_hash: None,
+                copies: None,
+                issued_at: None,
+                expires_at: None,
+                starts_at: None,
+                updated_at: None,
+                extra: Some(extra),
+                reference: None,
+                reference_hash: None,
+            },
+        };
+        data.try_to_vec().unwrap()
+    }
+
+    pub fn encode_unfreeze_action(&self, action_id: U128, token_id: String, receiver_id: AccountId, token_contract: AccountId) -> Vec<u8> {
+        let event = UnfreezeNftData {
+            action_id ,
+            token_id,
+            receiver_id,
+            token_contract
+        };
+        event.try_to_vec().unwrap()
+    }
+
 
     pub fn get_group_key(&self) -> [u8; 32] {
         self.group_key

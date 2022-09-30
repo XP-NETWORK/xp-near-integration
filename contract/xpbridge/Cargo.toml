@@ -10,6 +10,7 @@ crate-type = ["cdylib"]
 near-sdk = "4.0.0"
 near-contract-standards = "4.0.0"
 ed25519-compact = { version = "1.0.11", default-features=false }
+sha2 = "*"
 
 [dev-dependencies]
 ed25519-dalek = { version = "1.0.1", features = ["std", "rand"] }

@@ -1318,6 +1318,7 @@ dependencies = [
  "near-contract-standards",
  "near-sdk",
  "rand_core 0.5.1",
+ "sha2 0.9.9",
 ]
 
 [[package]]
