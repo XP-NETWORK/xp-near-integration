@@ -3,7 +3,6 @@ use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_contract_standards::non_fungible_token::Token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::env::sha256;
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseError};
@@ -119,13 +118,13 @@ impl XpBridge {
     }
 
     #[payable]
-    pub fn validate_pause(&mut self, data: PauseData, sig_data: Base64VecU8) {
+    pub fn validate_pause(&mut self, data: PauseData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
         self.require_sig(
             data.action_id.into(),
-            sha256(data.try_to_vec().unwrap().as_slice()),
-            sig_data.into(),
+            data.try_to_vec().unwrap(),
+            sig_data,
             b"SetPause",
         );
 
@@ -133,13 +132,13 @@ impl XpBridge {
     }
 
     #[payable]
-    pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Base64VecU8) {
+    pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Vec<u8>) {
         require!(self.paused, "unpaused");
 
         self.require_sig(
             data.action_id.into(),
-            sha256(data.try_to_vec().unwrap().as_slice()),
-            sig_data.into(),
+            data.try_to_vec().unwrap(),
+            sig_data,
             b"SetUnpause",
         );
 
@@ -150,14 +149,14 @@ impl XpBridge {
     pub fn validate_withdraw_fees(
         &mut self,
         data: WithdrawFeeData,
-        sig_data: Base64VecU8,
+        sig_data: Vec<u8>,
     ) -> Promise {
         require!(!self.paused, "paused");
 
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data.into(),
+            sig_data,
             b"WithdrawFees",
         );
 
@@ -179,13 +178,13 @@ impl XpBridge {
     }
 
     #[payable]
-    pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Base64VecU8) {
+    pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
         self.require_sig(
             data.action_id.into(),
-            sha256(data.try_to_vec().unwrap().as_slice()),
-            sig_data.into(),
+            data.try_to_vec().unwrap(),
+            sig_data,
             b"SetGroupKey",
         );
 
@@ -205,7 +204,7 @@ impl XpBridge {
 
         self.require_sig(
             data.action_id.into(),
-            sha256(data.try_to_vec().unwrap().as_slice()),
+            data.try_to_vec().unwrap(),
             sig_data.into(),
             b"WhitelistNft",
         );
@@ -214,7 +213,7 @@ impl XpBridge {
     }
 
     #[payable]
-    pub fn validate_blacklist(&mut self, data: WhitelistData, sig_data: Base64VecU8) {
+    pub fn validate_blacklist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
         require!(
@@ -225,8 +224,8 @@ impl XpBridge {
 
         self.require_sig(
             data.action_id.into(),
-            sha256(data.try_to_vec().unwrap().as_slice()),
-            sig_data.into(),
+            data.try_to_vec().unwrap(),
+            sig_data,
             b"ValidateBlacklistNft"
         );
 
@@ -238,18 +237,13 @@ impl XpBridge {
     pub fn validate_transfer_nft(
         &mut self,
         data: TransferNftData,
-        sig_data: Base64VecU8,
+        sig_data: Vec<u8>,
     ) -> Promise {
         require!(!self.paused, "paused");
 
-        require!(
-            self.whitelist.contains_key(&data.mint_with.to_string()),
-            "Not whitelist"
-        );
-
         self.require_sig(
             data.action_id.into(),
-            sha256(data.try_to_vec().unwrap().as_slice()),
+            data.try_to_vec().unwrap(),
             sig_data.into(),
             b"ValidateTransferNft",
         );
@@ -404,14 +398,14 @@ impl XpBridge {
     pub fn validate_unfreeze_nft(
         &mut self,
         data: UnfreezeNftData,
-        sig_data: Base64VecU8,
+        sig_data: Vec<u8>,
     ) -> Promise {
         require!(!self.paused, "paused");
 
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data.into(),
+            sig_data,
             b"ValidateUnfreezeNft",
         );
 
