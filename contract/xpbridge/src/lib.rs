@@ -79,6 +79,9 @@ pub struct XpBridge {
 
 #[near_bindgen]
 impl XpBridge {
+    /// Initializes the contract with the provided group key.
+    /// Also sets the initial action count, whitelist, and 
+    /// other contract state variables. 
     #[init]
     pub fn initialize(group_key: [u8; 32]) -> Self {
         assert!(
@@ -117,6 +120,9 @@ impl XpBridge {
         require!(res.is_ok(), "Unauthorized Action");
     }
 
+    /// Pauses the contract which will stop all bridge actions from being executed.
+    /// /// FAILS: If already paused.
+    /// REQUIRED: Signature verification.
     #[payable]
     pub fn validate_pause(&mut self, data: PauseData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
@@ -131,6 +137,9 @@ impl XpBridge {
         self.paused = true;
     }
 
+    /// Unpauses the contract which will stop all bridge actions from being executed.
+    /// FAILS: If already unpaused.
+    /// REQUIRED: Signature verification. 
     #[payable]
     pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Vec<u8>) {
         require!(self.paused, "unpaused");
@@ -145,6 +154,10 @@ impl XpBridge {
         self.paused = false;
     }
 
+    /// Withdraws the fees collected by the contract on NFT transfers.
+    /// to the account_id provied in the {WithdrawFeeData}.
+    /// FAILS: If contract is paused.
+    /// REQUIRED: Signature verification. 
     #[payable]
     pub fn validate_withdraw_fees(
         &mut self,
@@ -167,6 +180,9 @@ impl XpBridge {
             .then(Self::ext(env::current_account_id()).withdraw_fee_callback())
     }
 
+    /// This is the callback function when the promise in the
+    /// validate_withdraw_fees function is completed. It will
+    /// check if the promise result was successful or not.
     #[private]
     pub fn withdraw_fee_callback(
         &mut self,
@@ -176,7 +192,9 @@ impl XpBridge {
 
         self.tx_fees = 0;
     }
-
+    /// Updates the Group Key for the contract. 
+    /// FAILS: If contract is paused.
+    /// REQUIRED: Signature verification.
     #[payable]
     pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
@@ -191,6 +209,12 @@ impl XpBridge {
         self.group_key = data.group_key;
     }
 
+    /// Updates the whitelist for the contract.
+    /// Adds the provided account_id to the whitelist
+    /// so that they can be freezed for transfers to work
+    /// in the bridge
+    /// FAILS: If contract is paused.
+    /// REQUIRED: Signature verification.
     #[payable]
     pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Base64VecU8) {
         require!(!self.paused, "paused");
@@ -211,7 +235,12 @@ impl XpBridge {
 
         self.whitelist.insert(data.token_contract, true);
     }
-
+    /// Updates the whitelist for the contract.
+    /// Removes the provided account_id from the whitelist
+    /// so that they cannot be freezed for transfers to work
+    /// in the bridge
+    /// FAILS: If contract is paused AND if the contract is not present in whitelist.
+    /// REQUIRED: Signature verification.
     #[payable]
     pub fn validate_blacklist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
@@ -232,7 +261,10 @@ impl XpBridge {
         self.whitelist.remove(&data.token_contract);
     }
 
-    /// Transfer foreign NFT. mint wrapped NFT
+    /// Validates the transfer of NFT from the bridge to the destination chain.
+    /// It mints a new NEP-171 token on chain to the destination account_id.
+    /// FAILS: If contract is paused.
+    /// REQUIRED: Signature verification.
     #[payable]
     pub fn validate_transfer_nft(
         &mut self,
@@ -253,7 +285,9 @@ impl XpBridge {
             .nft_mint(data.token_id, data.owner_id, data.token_metadata)
     }
 
-    /// Withdraw foreign NFT
+    /// Withdraw foreign NFT. This creates a promise to get the token data
+    /// from the foreign contract and then calls the callback function 
+    /// 'token_callback'.
     /// WARN: Even though this contract doesn't check if the burner is trusted,
     /// we check this in the bridge infrastructure(i.e in the validator)
     #[payable]
@@ -285,6 +319,10 @@ impl XpBridge {
             ))
     }
 
+    /// This is the callback function when the promise in the withdraw_nft
+    /// function is completed. It will check if the promise result was
+    /// successful or not. If it was successful, it will create a nft burn
+    /// promise and then call the callback function 'burn_callback'.
     #[private]
     pub fn token_callback(
         &mut self,
@@ -309,6 +347,9 @@ impl XpBridge {
             ))
     }
 
+    /// This is the callback function when the promise in the token_callback
+    /// function is completed. It will check if the promise result was
+    /// successful or not. If it was successful, it will emit an unfreeze nft event
     #[private]
     pub fn withdraw_callback(
         &mut self,
@@ -337,7 +378,9 @@ impl XpBridge {
         Promise::new(env::current_account_id()).transfer(amt.into())
     }
 
-    /// Freeze NEP-171 token.
+    /// Freezes the NFT on the bridge contract. NFT is transferred to this
+    /// bridge contract with a promise and then on completion of the promise
+    /// the callback function `freeze_callback` is called.
     #[payable]
     pub fn freeze_nft(
         &mut self,
@@ -363,6 +406,10 @@ impl XpBridge {
             ))
     }
 
+    /// This is the callback function when the promise in the freeze_nft
+    /// function is completed. It will check if the promise result was
+    /// successful or not. If it was successful, it will emit a TransferNftEvent 
+    /// event.
     #[private]
     pub fn freeze_callback(
         &mut self,
@@ -393,7 +440,9 @@ impl XpBridge {
         Promise::new(env::current_account_id()).transfer(amt.into())
     }
 
-    /// Unfreeze NEP-171 token.
+    /// This function unfreezes the NFT on the bridge contract.
+    /// It will transfer the NFT from this contract to the receiver
+    /// contract.
     #[payable]
     pub fn validate_unfreeze_nft(
         &mut self,
@@ -417,6 +466,9 @@ impl XpBridge {
         )
     }
 
+    /// This function takes all the parameters of the TransferNftData
+    /// and then encodes into Bytes (Vec<u8>) which is consumed by the 
+    /// validator for signing the transaction.
     pub fn encode_transfer_action(
         &self,
         action_id: U128,
@@ -451,6 +503,9 @@ impl XpBridge {
         data.try_to_vec().unwrap()
     }
 
+    /// This function takes all the parameters of the UnfreezeNftData
+    /// and then encodes into Bytes (Vec<u8>) which is consumed by the 
+    /// validator for signing the transaction.
     pub fn encode_unfreeze_action(&self, action_id: U128, token_id: String, receiver_id: AccountId, token_contract: AccountId) -> Vec<u8> {
         let event = UnfreezeNftData {
             action_id ,
@@ -462,19 +517,25 @@ impl XpBridge {
     }
 
 
+    /// Gets the currently set group key from the state variables of the contract
     pub fn get_group_key(&self) -> [u8; 32] {
         self.group_key
     }
 
+    /// Checks if the contract provided in `contract_id` is whitelisted
+    /// or not. 
+    /// Returns boolean
     pub fn is_whitelist(&self, contract_id: String) -> bool {
         self.whitelist.contains_key(&contract_id)
     }
 
+    /// Checks if the contract is paused or not.
     pub fn is_paused(&self) -> bool {
         self.paused
     }
 
-    pub fn get_action_id(&self) -> U128 {
+    /// Gets the no of actions performed by the contract.
+    pub fn get_action_cnt(&self) -> U128 {
         U128(self.action_cnt)
     }
 }
