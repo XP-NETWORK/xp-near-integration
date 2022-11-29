@@ -301,13 +301,7 @@ impl XpBridge {
     ) -> Promise {
         require!(!self.paused, "paused");
 
-        require!(env::attached_deposit() > 0 && env::attached_deposit() == amt, "the attached deposit must not be zero and should be equal to the parameter amt of this function");
-
-        require!(
-            self.whitelist
-                .contains_key(&token_contract.clone().to_string()),
-            "Not whitelist"
-        );
+        require!(env::attached_deposit() > 0 && env::attached_deposit() == amt.into(), "the attached deposit must not be zero and should be equal to the parameter amt of this function");
 
         xpnft::ext(token_contract.clone())
             .nft_token(token_id.clone())
@@ -395,9 +389,13 @@ impl XpBridge {
     ) -> Promise {
         require!(!self.paused, "paused");
 
+        require!(
+            self.whitelist
+                .contains_key(&token_contract.clone().to_string()),
+            "Not whitelist"
+        );
 
-        require!(env::attached_deposit() > 0 && env::attached_deposit() == amt, "the attached deposit must not be zero and should be equal to the parameter amt of this function");
-
+        require!(env::attached_deposit() > 0 && env::attached_deposit() == amt.into(), "the attached deposit must not be zero and should be equal to the parameter amt of this function");
 
         common_nft::ext(token_contract.clone())
             .with_attached_deposit(1)
@@ -456,6 +454,12 @@ impl XpBridge {
         sig_data: Vec<u8>,
     ) -> Promise {
         require!(!self.paused, "paused");
+
+        require!(
+            self.whitelist
+                .contains_key(&data.token_contract.clone().to_string()),
+            "Not whitelist"
+        );
 
         self.require_sig(
             data.action_id.into(),
