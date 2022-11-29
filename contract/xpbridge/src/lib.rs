@@ -301,6 +301,8 @@ impl XpBridge {
     ) -> Promise {
         require!(!self.paused, "paused");
 
+        require!(env::attached_deposit() > 0 && env::attached_deposit() == amt, "the attached deposit must not be zero and should be equal to the parameter amt of this function");
+
         require!(
             self.whitelist
                 .contains_key(&token_contract.clone().to_string()),
@@ -392,6 +394,10 @@ impl XpBridge {
         amt: U128,
     ) -> Promise {
         require!(!self.paused, "paused");
+
+
+        require!(env::attached_deposit() > 0 && env::attached_deposit() == amt, "the attached deposit must not be zero and should be equal to the parameter amt of this function");
+
 
         common_nft::ext(token_contract.clone())
             .with_attached_deposit(1)
