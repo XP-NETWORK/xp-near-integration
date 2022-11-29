@@ -355,7 +355,7 @@ impl XpBridge {
         to: String,
         amt: u128,
         #[callback_result] call_result: Result<(), PromiseError>,
-    ) -> Promise {
+    ) {
         require!(call_result.is_ok(), "withdraw failed");
 
         self.action_cnt += 1;
@@ -371,7 +371,6 @@ impl XpBridge {
         }
         .emit();
 
-        Promise::new(env::current_account_id()).transfer(amt.into())
     }
 
     /// Freezes the NFT on the bridge contract. NFT is transferred to this
@@ -424,7 +423,7 @@ impl XpBridge {
         mint_with: String,
         amt: u128,
         #[callback_result] call_result: Result<(), PromiseError>,
-    ) -> Promise {
+    ) {
         require!(call_result.is_ok(), "freeze failed");
 
         self.action_cnt += 1;
@@ -441,7 +440,6 @@ impl XpBridge {
         }
         .emit();
 
-        Promise::new(env::current_account_id()).transfer(amt.into())
     }
 
     /// This function unfreezes the NFT on the bridge contract.
