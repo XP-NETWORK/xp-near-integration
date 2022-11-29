@@ -211,7 +211,7 @@ impl XpBridge {
     /// in the bridge
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification.
-    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Base64VecU8) {
+    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
         require!(
