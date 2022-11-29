@@ -123,7 +123,6 @@ impl XpBridge {
     /// Pauses the contract which will stop all bridge actions from being executed.
     /// /// FAILS: If already paused.
     /// REQUIRED: Signature verification.
-    #[payable]
     pub fn validate_pause(&mut self, data: PauseData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
@@ -140,7 +139,6 @@ impl XpBridge {
     /// Unpauses the contract which will stop all bridge actions from being executed.
     /// FAILS: If already unpaused.
     /// REQUIRED: Signature verification. 
-    #[payable]
     pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Vec<u8>) {
         require!(self.paused, "unpaused");
 
@@ -158,7 +156,6 @@ impl XpBridge {
     /// to the account_id provied in the {WithdrawFeeData}.
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification. 
-    #[payable]
     pub fn validate_withdraw_fees(
         &mut self,
         data: WithdrawFeeData,
@@ -195,7 +192,6 @@ impl XpBridge {
     /// Updates the Group Key for the contract. 
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification.
-    #[payable]
     pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
@@ -215,7 +211,6 @@ impl XpBridge {
     /// in the bridge
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification.
-    #[payable]
     pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Base64VecU8) {
         require!(!self.paused, "paused");
 
@@ -241,7 +236,6 @@ impl XpBridge {
     /// in the bridge
     /// FAILS: If contract is paused AND if the contract is not present in whitelist.
     /// REQUIRED: Signature verification.
-    #[payable]
     pub fn validate_blacklist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
@@ -290,7 +284,6 @@ impl XpBridge {
     /// 'token_callback'.
     /// WARN: Even though this contract doesn't check if the burner is trusted,
     /// we check this in the bridge infrastructure(i.e in the validator)
-    #[payable]
     pub fn withdraw_nft(
         &mut self,
         token_contract: AccountId,
@@ -445,7 +438,6 @@ impl XpBridge {
     /// This function unfreezes the NFT on the bridge contract.
     /// It will transfer the NFT from this contract to the receiver
     /// contract.
-    #[payable]
     pub fn validate_unfreeze_nft(
         &mut self,
         data: UnfreezeNftData,
