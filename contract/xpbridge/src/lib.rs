@@ -102,7 +102,6 @@ impl XpBridge {
     /// Ed25519 Signature verification logic.
     /// Signature check for bridge actions.
     /// Consumes the passed action_id.
-    #[private]
     fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>, context: &[u8]) {
         let f = self.consumed_actions.contains_key(&action_id);
         require!(!f, "Duplicated Action");
