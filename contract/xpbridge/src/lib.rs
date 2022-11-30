@@ -463,8 +463,17 @@ impl XpBridge {
             data.token_id,
             None,
             None,
-        )
+        ).then(Self::ext(env::current_account_id()).validate_unfreeze_callback())
     }
+
+    /// This is the callback function when the promise in the validate_unfreeze_nft
+    /// function is completed. It will check if the promise result was
+    /// successful or not.
+    pub fn validate_unfreeze_callback(&mut self, #[callback_result] call_result: Result<(), PromiseError>) {
+        require!(call_result.is_ok(), format!("validate_unfreeze failed: {:?}", call_result));
+    }
+
+
 
     /// This function takes all the parameters of the TransferNftData
     /// and then encodes into Bytes (Vec<u8>) which is consumed by the 
