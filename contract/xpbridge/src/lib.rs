@@ -283,6 +283,7 @@ impl XpBridge {
     /// 'token_callback'.
     /// WARN: Even though this contract doesn't check if the burner is trusted,
     /// we check this in the bridge infrastructure(i.e in the validator)
+    #[payable]
     pub fn withdraw_nft(
         &mut self,
         token_contract: AccountId,
