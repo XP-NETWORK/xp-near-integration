@@ -222,7 +222,7 @@ impl XpBridge {
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data.into(),
+            sig_data,
             b"WhitelistNft",
         );
 
