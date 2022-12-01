@@ -468,6 +468,7 @@ impl XpBridge {
     /// This is the callback function when the promise in the validate_unfreeze_nft
     /// function is completed. It will check if the promise result was
     /// successful or not.
+    #[private]
     pub fn validate_unfreeze_callback(&mut self, #[callback_result] call_result: Result<(), PromiseError>) {
         require!(call_result.is_ok(), format!("validate_unfreeze failed: {:?}", call_result));
     }
