@@ -43,8 +43,7 @@ pub struct WhitelistData {
 #[serde(crate = "near_sdk::serde")]
 pub struct WithdrawFeeData {
     pub action_id: U128,
-    pub account_id: String,
-    pub public_key: Vec<u8>,
+    pub account_id: AccountId,
 }
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
@@ -170,8 +169,8 @@ impl XpBridge {
         );
 
         let storage_used = env::storage_usage();
-        let amt = self.tx_fees - storage_used as u128 * env::storage_byte_cost();
-        Promise::new(env::current_account_id())
+        let amt = env::account_balance() - storage_used as u128 * env::storage_byte_cost();
+        Promise::new(data.account_id)
             .transfer(amt)
             .then(Self::ext(env::current_account_id()).withdraw_fee_callback())
     }
