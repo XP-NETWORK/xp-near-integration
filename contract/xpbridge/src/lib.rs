@@ -3,7 +3,7 @@ use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_contract_standards::non_fungible_token::Token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::{Base64VecU8, U128};
+use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseError};
 use sha2::{Digest, Sha512};
@@ -275,7 +275,17 @@ impl XpBridge {
         xpnft::ext(data.mint_with)
             .with_attached_deposit(env::attached_deposit())
             .nft_mint(data.token_id, data.owner_id, data.token_metadata)
+            .then(Self::ext(env::current_account_id()).validate_transfer_callback())
     }
+
+    // This is the callback function when the promise in the validate_unfreeze_nft
+    /// function is completed. It will check if the promise result was
+    /// successful or not.
+    #[private]
+    pub fn validate_transfer_callback(&mut self, #[callback_result] call_result: Result<Token, PromiseError>) {
+        require!(call_result.is_ok(), format!("validate_transfer failed: {:?}", call_result));
+    }
+
 
     /// Withdraw foreign NFT. This creates a promise to get the token data
     /// from the foreign contract and then calls the callback function 
