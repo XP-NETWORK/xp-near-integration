@@ -5,13 +5,19 @@ use near_contract_standards::non_fungible_token::Token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseError};
+use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseError, Gas};
 use sha2::{Digest, Sha512};
 use std::collections::HashMap;
 pub mod events;
 pub mod external;
 pub use crate::events::*;
 pub use crate::external::*;
+
+
+const GAS_FOR_FREEZE_NFT: Gas = Gas(35_000_000_000_000); 
+const GAS_FOR_WITHDRAW_NFT: Gas = Gas(30_000_000_000_000);
+const GAS_FOR_VALIDATE_TRANSFER: Gas = Gas(30_000_000_000_000); 
+const GAS_FOR_VALIDATE_UNFREEZE: Gas = Gas(35_000_000_000_000); 
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
@@ -263,6 +269,7 @@ impl XpBridge {
         data: TransferNftData,
         sig_data: Vec<u8>,
     ) -> Promise {
+        require!(env::prepaid_gas() > GAS_FOR_VALIDATE_TRANSFER, "Not enough gas");
         require!(!self.paused, "paused");
 
         self.require_sig(
@@ -301,6 +308,7 @@ impl XpBridge {
         to: String,
         amt: U128,
     ) -> Promise {
+        require!(env::prepaid_gas() > GAS_FOR_WITHDRAW_NFT, "Not enough gas");
         require!(!self.paused, "paused");
 
         require!(env::attached_deposit() > 0 && env::attached_deposit() == amt.into(), "the attached deposit must not be zero and should be equal to the parameter amt of this function");
@@ -388,6 +396,7 @@ impl XpBridge {
         mint_with: String,
         amt: U128,
     ) -> Promise {
+        require!(env::prepaid_gas() > GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
 
         require!(
@@ -400,6 +409,7 @@ impl XpBridge {
 
         common_nft::ext(token_contract.clone())
             .with_attached_deposit(1)
+            .with_static_gas(GAS_FOR_FREEZE_NFT)
             .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
             .then(Self::ext(env::current_account_id()).freeze_callback(
                 token_contract,
@@ -452,6 +462,7 @@ impl XpBridge {
         data: UnfreezeNftData,
         sig_data: Vec<u8>,
     ) -> Promise {
+        require!(env::prepaid_gas() > GAS_FOR_VALIDATE_UNFREEZE, "Not enough gas");
         require!(!self.paused, "paused");
 
         require!(
