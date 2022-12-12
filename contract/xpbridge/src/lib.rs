@@ -1,11 +1,11 @@
 use ed25519_compact::{PublicKey, Signature};
 use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
-use near_contract_standards::non_fungible_token::TokenId;
 use near_contract_standards::non_fungible_token::Token;
+use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, near_bindgen, require, AccountId, Promise, PromiseError, Gas};
+use near_sdk::{env, near_bindgen, require, AccountId, Gas, Promise, PromiseError};
 use sha2::{Digest, Sha512};
 use std::collections::HashMap;
 pub mod events;
@@ -13,11 +13,10 @@ pub mod external;
 pub use crate::events::*;
 pub use crate::external::*;
 
-
-const GAS_FOR_FREEZE_NFT: Gas = Gas(35_000_000_000_000); 
+const GAS_FOR_FREEZE_NFT: Gas = Gas(35_000_000_000_000);
 const GAS_FOR_WITHDRAW_NFT: Gas = Gas(30_000_000_000_000);
-const GAS_FOR_VALIDATE_TRANSFER: Gas = Gas(30_000_000_000_000); 
-const GAS_FOR_VALIDATE_UNFREEZE: Gas = Gas(35_000_000_000_000); 
+const GAS_FOR_VALIDATE_TRANSFER: Gas = Gas(30_000_000_000_000);
+const GAS_FOR_VALIDATE_UNFREEZE: Gas = Gas(35_000_000_000_000);
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
@@ -85,8 +84,8 @@ pub struct XpBridge {
 #[near_bindgen]
 impl XpBridge {
     /// Initializes the contract with the provided group key.
-    /// Also sets the initial action count, whitelist, and 
-    /// other contract state variables. 
+    /// Also sets the initial action count, whitelist, and
+    /// other contract state variables.
     #[init]
     pub fn initialize(group_key: [u8; 32]) -> Self {
         assert!(
@@ -142,7 +141,7 @@ impl XpBridge {
 
     /// Unpauses the contract which will stop all bridge actions from being executed.
     /// FAILS: If already unpaused.
-    /// REQUIRED: Signature verification. 
+    /// REQUIRED: Signature verification.
     pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Vec<u8>) {
         require!(self.paused, "unpaused");
 
@@ -159,12 +158,8 @@ impl XpBridge {
     /// Withdraws the fees collected by the contract on NFT transfers.
     /// to the account_id provied in the {WithdrawFeeData}.
     /// FAILS: If contract is paused.
-    /// REQUIRED: Signature verification. 
-    pub fn validate_withdraw_fees(
-        &mut self,
-        data: WithdrawFeeData,
-        sig_data: Vec<u8>,
-    ) -> Promise {
+    /// REQUIRED: Signature verification.
+    pub fn validate_withdraw_fees(&mut self, data: WithdrawFeeData, sig_data: Vec<u8>) -> Promise {
         require!(!self.paused, "paused");
 
         self.require_sig(
@@ -193,7 +188,7 @@ impl XpBridge {
 
         self.tx_fees = 0;
     }
-    /// Updates the Group Key for the contract. 
+    /// Updates the Group Key for the contract.
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification.
     pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
@@ -253,7 +248,7 @@ impl XpBridge {
             data.action_id.into(),
             data.try_to_vec().unwrap(),
             sig_data,
-            b"ValidateBlacklistNft"
+            b"ValidateBlacklistNft",
         );
 
         self.whitelist.remove(&data.token_contract);
@@ -264,12 +259,11 @@ impl XpBridge {
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification.
     #[payable]
-    pub fn validate_transfer_nft(
-        &mut self,
-        data: TransferNftData,
-        sig_data: Vec<u8>,
-    ) -> Promise {
-        require!(env::prepaid_gas() > GAS_FOR_VALIDATE_TRANSFER, "Not enough gas");
+    pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) -> Promise {
+        require!(
+            env::prepaid_gas() > GAS_FOR_VALIDATE_TRANSFER,
+            "Not enough gas"
+        );
         require!(!self.paused, "paused");
 
         self.require_sig(
@@ -281,21 +275,31 @@ impl XpBridge {
 
         xpnft::ext(data.mint_with)
             .with_attached_deposit(env::attached_deposit())
+            .with_static_gas(Gas(TGAS * 10))
             .nft_mint(data.token_id, data.owner_id, data.token_metadata)
-            .then(Self::ext(env::current_account_id()).validate_transfer_callback())
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 10))
+                    .validate_transfer_callback(),
+            )
     }
 
     // This is the callback function when the promise in the validate_unfreeze_nft
     /// function is completed. It will check if the promise result was
     /// successful or not.
     #[private]
-    pub fn validate_transfer_callback(&mut self, #[callback_result] call_result: Result<Token, PromiseError>) {
-        require!(call_result.is_ok(), format!("validate_transfer failed: {:?}", call_result));
+    pub fn validate_transfer_callback(
+        &mut self,
+        #[callback_result] call_result: Result<Token, PromiseError>,
+    ) {
+        require!(
+            call_result.is_ok(),
+            format!("validate_transfer failed: {:?}", call_result)
+        );
     }
 
-
     /// Withdraw foreign NFT. This creates a promise to get the token data
-    /// from the foreign contract and then calls the callback function 
+    /// from the foreign contract and then calls the callback function
     /// 'token_callback'.
     /// WARN: Even though this contract doesn't check if the burner is trusted,
     /// we check this in the bridge infrastructure(i.e in the validator)
@@ -314,15 +318,20 @@ impl XpBridge {
         require!(env::attached_deposit() > 0 && env::attached_deposit() == amt.into(), "the attached deposit must not be zero and should be equal to the parameter amt of this function");
 
         xpnft::ext(token_contract.clone())
+            .with_static_gas(Gas(TGAS * 10))
             .nft_token(token_id.clone())
-            .then(Self::ext(env::current_account_id()).token_callback(
-                token_contract,
-                token_id,
-                env::predecessor_account_id(),
-                chain_nonce,
-                to,
-                amt.into(),
-            ))
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 25))
+                    .token_callback(
+                        token_contract,
+                        token_id,
+                        env::predecessor_account_id(),
+                        chain_nonce,
+                        to,
+                        amt.into(),
+                    ),
+            )
     }
 
     /// This is the callback function when the promise in the withdraw_nft
@@ -343,14 +352,19 @@ impl XpBridge {
         require!(call_result.is_ok(), "token callback failed");
 
         xpnft::ext(token_contract.clone())
+            .with_static_gas(Gas(TGAS * 10))
             .nft_burn(token_id.clone(), owner_id)
-            .then(Self::ext(env::current_account_id()).withdraw_callback(
-                token_contract,
-                call_result.unwrap(),
-                chain_nonce,
-                to,
-                amt.into(),
-            ))
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 10))
+                    .withdraw_callback(
+                        token_contract,
+                        call_result.unwrap(),
+                        chain_nonce,
+                        to,
+                        amt.into(),
+                    ),
+            )
     }
 
     /// This is the callback function when the promise in the token_callback
@@ -380,7 +394,6 @@ impl XpBridge {
             token,
         }
         .emit();
-
     }
 
     /// Freezes the NFT on the bridge contract. NFT is transferred to this
@@ -409,21 +422,25 @@ impl XpBridge {
 
         common_nft::ext(token_contract.clone())
             .with_attached_deposit(1)
-            .with_static_gas(GAS_FOR_FREEZE_NFT)
+            .with_static_gas(Gas(TGAS * 15))
             .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
-            .then(Self::ext(env::current_account_id()).freeze_callback(
-                token_contract,
-                token_id,
-                chain_nonce,
-                to,
-                mint_with,
-                amt.into(),
-            ))
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 10))
+                    .freeze_callback(
+                        token_contract,
+                        token_id,
+                        chain_nonce,
+                        to,
+                        mint_with,
+                        amt.into(),
+                    ),
+            )
     }
 
     /// This is the callback function when the promise in the freeze_nft
     /// function is completed. It will check if the promise result was
-    /// successful or not. If it was successful, it will emit a TransferNftEvent 
+    /// successful or not. If it was successful, it will emit a TransferNftEvent
     /// event.
     #[private]
     pub fn freeze_callback(
@@ -451,18 +468,16 @@ impl XpBridge {
             mint_with,
         }
         .emit();
-
     }
 
     /// This function unfreezes the NFT on the bridge contract.
     /// It will transfer the NFT from this contract to the receiver
     /// contract.
-    pub fn validate_unfreeze_nft(
-        &mut self,
-        data: UnfreezeNftData,
-        sig_data: Vec<u8>,
-    ) -> Promise {
-        require!(env::prepaid_gas() > GAS_FOR_VALIDATE_UNFREEZE, "Not enough gas");
+    pub fn validate_unfreeze_nft(&mut self, data: UnfreezeNftData, sig_data: Vec<u8>) -> Promise {
+        require!(
+            env::prepaid_gas() > GAS_FOR_VALIDATE_UNFREEZE,
+            "Not enough gas"
+        );
         require!(!self.paused, "paused");
 
         require!(
@@ -478,26 +493,32 @@ impl XpBridge {
             b"ValidateUnfreezeNft",
         );
 
-        common_nft::ext(data.token_contract).nft_transfer(
-            data.receiver_id,
-            data.token_id,
-            None,
-            None,
-        ).then(Self::ext(env::current_account_id()).validate_unfreeze_callback())
+        common_nft::ext(data.token_contract)
+            .with_static_gas(Gas(TGAS * 20))
+            .nft_transfer(data.receiver_id, data.token_id, None, None)
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 8))
+                    .validate_unfreeze_callback(),
+            )
     }
 
     /// This is the callback function when the promise in the validate_unfreeze_nft
     /// function is completed. It will check if the promise result was
     /// successful or not.
     #[private]
-    pub fn validate_unfreeze_callback(&mut self, #[callback_result] call_result: Result<(), PromiseError>) {
-        require!(call_result.is_ok(), format!("validate_unfreeze failed: {:?}", call_result));
+    pub fn validate_unfreeze_callback(
+        &mut self,
+        #[callback_result] call_result: Result<(), PromiseError>,
+    ) {
+        require!(
+            call_result.is_ok(),
+            format!("validate_unfreeze failed: {:?}", call_result)
+        );
     }
 
-
-
     /// This function takes all the parameters of the TransferNftData
-    /// and then encodes into Bytes (Vec<u8>) which is consumed by the 
+    /// and then encodes into Bytes (Vec<u8>) which is consumed by the
     /// validator for signing the transaction.
     pub fn encode_transfer_action(
         &self,
@@ -508,7 +529,7 @@ impl XpBridge {
         title: String,
         description: String,
         media: String,
-        extra: String
+        extra: String,
     ) -> Vec<u8> {
         let data = TransferNftData {
             action_id,
@@ -534,18 +555,23 @@ impl XpBridge {
     }
 
     /// This function takes all the parameters of the UnfreezeNftData
-    /// and then encodes into Bytes (Vec<u8>) which is consumed by the 
+    /// and then encodes into Bytes (Vec<u8>) which is consumed by the
     /// validator for signing the transaction.
-    pub fn encode_unfreeze_action(&self, action_id: U128, token_id: String, receiver_id: AccountId, token_contract: AccountId) -> Vec<u8> {
+    pub fn encode_unfreeze_action(
+        &self,
+        action_id: U128,
+        token_id: String,
+        receiver_id: AccountId,
+        token_contract: AccountId,
+    ) -> Vec<u8> {
         let event = UnfreezeNftData {
-            action_id ,
+            action_id,
             token_id,
             receiver_id,
-            token_contract
+            token_contract,
         };
         event.try_to_vec().unwrap()
     }
-
 
     /// Gets the currently set group key from the state variables of the contract
     pub fn get_group_key(&self) -> [u8; 32] {
@@ -553,7 +579,7 @@ impl XpBridge {
     }
 
     /// Checks if the contract provided in `contract_id` is whitelisted
-    /// or not. 
+    /// or not.
     /// Returns boolean
     pub fn is_whitelist(&self, contract_id: String) -> bool {
         self.whitelist.contains_key(&contract_id)
