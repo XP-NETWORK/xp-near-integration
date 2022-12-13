@@ -315,13 +315,12 @@ impl XpBridge {
         token_contract: AccountId,
         token_id: TokenId,
         chain_nonce: u8,
-        to: String,
-        amt: U128,
+        to: String
     ) -> Promise {
         require!(env::prepaid_gas() > GAS_FOR_WITHDRAW_NFT, "Not enough gas");
         require!(!self.paused, "paused");
 
-        require!(env::attached_deposit() > 0 && env::attached_deposit() == amt.into(), "the attached deposit must not be zero and should be equal to the parameter amt of this function");
+        require!(env::attached_deposit() > 0, "the attached deposit must not be zero and should be equal to the parameter amt of this function");
 
         xpnft::ext(token_contract.clone())
             .with_static_gas(Gas(TGAS * 10))
@@ -335,7 +334,7 @@ impl XpBridge {
                         env::predecessor_account_id(),
                         chain_nonce,
                         to,
-                        amt.into(),
+                        env::attached_deposit()
                     ),
             )
     }
@@ -413,7 +412,6 @@ impl XpBridge {
         chain_nonce: u8,
         to: String,
         mint_with: String,
-        amt: U128,
     ) -> Promise {
         require!(env::prepaid_gas() > GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
@@ -424,7 +422,7 @@ impl XpBridge {
             "Not whitelist"
         );
 
-        require!(env::attached_deposit() > 0 && env::attached_deposit() == amt.into(), "the attached deposit must not be zero and should be equal to the parameter amt of this function");
+        require!(env::attached_deposit() > 0, "the attached deposit must not be zero and should be equal to the parameter amt of this function");
 
         common_nft::ext(token_contract.clone())
             .with_attached_deposit(1)
@@ -439,7 +437,7 @@ impl XpBridge {
                         chain_nonce,
                         to,
                         mint_with,
-                        amt.into(),
+                        env::attached_deposit()
                     ),
             )
     }
