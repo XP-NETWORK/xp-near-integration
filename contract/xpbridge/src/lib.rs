@@ -280,7 +280,7 @@ impl XpBridge {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(Gas(TGAS * 10))
-                    .validate_transfer_callback(),
+                    .validate_transfer_callback(data.action_id.0),
             )
     }
 
@@ -290,12 +290,18 @@ impl XpBridge {
     #[private]
     pub fn validate_transfer_callback(
         &mut self,
+        action_id: u128,
         #[callback_result] call_result: Result<Token, PromiseError>,
     ) {
-        require!(
-            call_result.is_ok(),
-            format!("validate_transfer failed: {:?}", call_result)
-        );
+      let _res = match call_result {
+            Ok(_) => {
+                // Do Nothing
+            }
+            Err(e) => {
+                self.consumed_actions.remove(&action_id);
+                env::panic_str(&format!("validate_transfer failed: {:?}", e))
+            },
+        };
     }
 
     /// Withdraw foreign NFT. This creates a promise to get the token data
@@ -499,7 +505,7 @@ impl XpBridge {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(Gas(TGAS * 8))
-                    .validate_unfreeze_callback(),
+                    .validate_unfreeze_callback(data.action_id.0),
             )
     }
 
@@ -509,12 +515,18 @@ impl XpBridge {
     #[private]
     pub fn validate_unfreeze_callback(
         &mut self,
+        action_id: u128,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
-        require!(
-            call_result.is_ok(),
-            format!("validate_unfreeze failed: {:?}", call_result)
-        );
+        let _res = match call_result {
+            Ok(_) => {
+                // Do Nothing
+            }
+            Err(e) => {
+                self.consumed_actions.remove(&action_id);
+                env::panic_str(&format!("validate_unfreeze failed: {:?}", e))
+            },
+        };
     }
 
     /// This function takes all the parameters of the TransferNftData
