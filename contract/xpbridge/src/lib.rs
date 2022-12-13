@@ -297,9 +297,8 @@ impl XpBridge {
             Ok(_) => {
                 // Do Nothing
             }
-            Err(e) => {
+            Err(_e) => {
                 self.consumed_actions.remove(&action_id);
-                env::panic_str(&format!("validate_transfer failed: {:?}", e))
             },
         };
     }
@@ -520,9 +519,8 @@ impl XpBridge {
             Ok(_) => {
                 // Do Nothing
             }
-            Err(e) => {
+            Err(_e) => {
                 self.consumed_actions.remove(&action_id);
-                env::panic_str(&format!("validate_unfreeze failed: {:?}", e))
             },
         };
     }
