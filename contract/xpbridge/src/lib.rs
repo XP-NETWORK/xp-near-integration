@@ -173,7 +173,7 @@ impl XpBridge {
         let amt = env::account_balance() - storage_used as u128 * env::storage_byte_cost();
         Promise::new(data.account_id)
             .transfer(amt)
-            .then(Self::ext(env::current_account_id()).withdraw_fee_callback())
+            .then(Self::ext(env::current_account_id()).withdraw_fee_callback(data.action_id.0))
     }
 
     /// This is the callback function when the promise in the
@@ -182,11 +182,18 @@ impl XpBridge {
     #[private]
     pub fn withdraw_fee_callback(
         &mut self,
+        action_id: u128,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
-        require!(call_result.is_ok(), "withdraw failed");
-
-        self.tx_fees = 0;
+        match call_result {
+            Err(_e) => {
+                self.consumed_actions.remove(&action_id);
+            }
+            Ok(_) => {
+                // Do nothing
+                self.tx_fees = 0;
+            }
+        }
     }
     /// Updates the Group Key for the contract.
     /// FAILS: If contract is paused.
@@ -293,13 +300,13 @@ impl XpBridge {
         action_id: u128,
         #[callback_result] call_result: Result<Token, PromiseError>,
     ) {
-      let _res = match call_result {
+        let _res = match call_result {
             Ok(_) => {
                 // Do Nothing
             }
             Err(_e) => {
                 self.consumed_actions.remove(&action_id);
-            },
+            }
         };
     }
 
@@ -314,7 +321,7 @@ impl XpBridge {
         token_contract: AccountId,
         token_id: TokenId,
         chain_nonce: u8,
-        to: String
+        to: String,
     ) -> Promise {
         require!(env::prepaid_gas() > GAS_FOR_WITHDRAW_NFT, "Not enough gas");
         require!(!self.paused, "paused");
@@ -333,7 +340,7 @@ impl XpBridge {
                         env::predecessor_account_id(),
                         chain_nonce,
                         to,
-                        env::attached_deposit()
+                        env::attached_deposit(),
                     ),
             )
     }
@@ -436,7 +443,7 @@ impl XpBridge {
                         chain_nonce,
                         to,
                         mint_with,
-                        env::attached_deposit()
+                        env::attached_deposit(),
                     ),
             )
     }
@@ -521,7 +528,7 @@ impl XpBridge {
             }
             Err(_e) => {
                 self.consumed_actions.remove(&action_id);
-            },
+            }
         };
     }
 
