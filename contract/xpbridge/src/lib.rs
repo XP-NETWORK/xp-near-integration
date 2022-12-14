@@ -326,7 +326,7 @@ impl XpBridge {
         require!(env::prepaid_gas() > GAS_FOR_WITHDRAW_NFT, "Not enough gas");
         require!(!self.paused, "paused");
 
-        require!(env::attached_deposit() > 0, "the attached deposit must not be zero and should be equal to the parameter amt of this function");
+        require!(env::attached_deposit() > 0, "the attached deposit must not be zero");
 
         xpnft::ext(token_contract.clone())
             .with_static_gas(Gas(TGAS * 10))
@@ -428,7 +428,7 @@ impl XpBridge {
             "Not whitelist"
         );
 
-        require!(env::attached_deposit() > 0, "the attached deposit must not be zero and should be equal to the parameter amt of this function");
+        require!(env::attached_deposit() > 0, "the attached deposit must not be zero");
 
         common_nft::ext(token_contract.clone())
             .with_attached_deposit(1)
