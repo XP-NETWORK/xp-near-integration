@@ -326,7 +326,10 @@ impl XpBridge {
         require!(env::prepaid_gas() > GAS_FOR_WITHDRAW_NFT, "Not enough gas");
         require!(!self.paused, "paused");
 
-        require!(env::attached_deposit() > 0, "the attached deposit must not be zero");
+        require!(
+            env::attached_deposit() > 0,
+            "the attached deposit must not be zero"
+        );
 
         xpnft::ext(token_contract.clone())
             .with_static_gas(Gas(TGAS * 10))
@@ -374,6 +377,7 @@ impl XpBridge {
                         chain_nonce,
                         to,
                         amt.into(),
+                        env::predecessor_account_id(),
                     ),
             )
     }
@@ -389,22 +393,30 @@ impl XpBridge {
         chain_nonce: u8,
         to: String,
         amt: u128,
+        sender: AccountId,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         require!(call_result.is_ok(), "withdraw failed");
 
-        self.action_cnt += 1;
-        self.tx_fees += amt;
+        match call_result {
+            Ok(_) => {
+                self.action_cnt += 1;
+                self.tx_fees += amt;
 
-        UnfreezeNftEvent {
-            action_id: self.action_cnt,
-            chain_nonce,
-            to,
-            amt,
-            contract: token_contract,
-            token,
+                UnfreezeNftEvent {
+                    action_id: self.action_cnt,
+                    chain_nonce,
+                    to,
+                    amt,
+                    contract: token_contract,
+                    token,
+                }
+                .emit();
+            }
+            Err(_e) => {
+                Promise::new(sender).transfer(amt);
+            }
         }
-        .emit();
     }
 
     /// Freezes the NFT on the bridge contract. NFT is transferred to this
@@ -428,7 +440,10 @@ impl XpBridge {
             "Not whitelist"
         );
 
-        require!(env::attached_deposit() > 0, "the attached deposit must not be zero");
+        require!(
+            env::attached_deposit() > 0,
+            "the attached deposit must not be zero"
+        );
 
         common_nft::ext(token_contract.clone())
             .with_attached_deposit(1)
