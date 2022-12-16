@@ -162,7 +162,10 @@ impl XpBridge {
     /// REQUIRED: Signature verification.
     pub fn validate_withdraw_fees(&mut self, data: WithdrawFeeData, sig_data: Vec<u8>) -> Promise {
         require!(!self.paused, "paused");
-        require!(env::prepaid_gas() > GAS_FOR_VALIDATE_WITHDRAW, "Not enough gas");
+        require!(
+            env::prepaid_gas() > GAS_FOR_VALIDATE_WITHDRAW,
+            "Not enough gas"
+        );
 
         self.require_sig(
             data.action_id.into(),
@@ -173,11 +176,11 @@ impl XpBridge {
 
         let storage_used = env::storage_usage();
         let amt = env::account_balance() - storage_used as u128 * env::storage_byte_cost();
-        Promise::new(data.account_id)
-            .transfer(amt)
-            .then(Self::ext(env::current_account_id())
-            .with_static_gas(Gas(TGAS * 15))
-            .withdraw_fee_callback(data.action_id.0))
+        Promise::new(data.account_id).transfer(amt).then(
+            Self::ext(env::current_account_id())
+                .with_static_gas(Gas(TGAS * 15))
+                .withdraw_fee_callback(data.action_id.0),
+        )
     }
 
     /// This is the callback function when the promise in the
@@ -463,6 +466,7 @@ impl XpBridge {
                         to,
                         mint_with,
                         env::attached_deposit(),
+                        env::predecessor_account_id()
                     ),
             )
     }
@@ -480,23 +484,29 @@ impl XpBridge {
         to: String,
         mint_with: String,
         amt: u128,
+        sender: AccountId,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
-        require!(call_result.is_ok(), "freeze failed");
+        match call_result {
+            Ok(_) => {
+                self.action_cnt += 1;
+                self.tx_fees += amt;
 
-        self.action_cnt += 1;
-        self.tx_fees += amt;
-
-        TransferNftEvent {
-            action_id: self.action_cnt,
-            chain_nonce,
-            to,
-            amt,
-            contract: token_contract,
-            token_id,
-            mint_with,
+                TransferNftEvent {
+                    action_id: self.action_cnt,
+                    chain_nonce,
+                    to,
+                    amt,
+                    contract: token_contract,
+                    token_id,
+                    mint_with,
+                }
+                .emit();
+            }
+            Err(_e) => {
+                Promise::new(sender).transfer(amt);
+            }
         }
-        .emit();
     }
 
     /// This function unfreezes the NFT on the bridge contract.
