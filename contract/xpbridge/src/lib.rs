@@ -14,7 +14,7 @@ pub use crate::events::*;
 pub use crate::external::*;
 
 const GAS_FOR_FREEZE_NFT: Gas = Gas(35_000_000_000_000);
-const GAS_FOR_WITHDRAW_NFT: Gas = Gas(30_000_000_000_000);
+const GAS_FOR_WITHDRAW_NFT: Gas = Gas(35_000_000_000_000);
 const GAS_FOR_VALIDATE_TRANSFER: Gas = Gas(30_000_000_000_000);
 const GAS_FOR_VALIDATE_UNFREEZE: Gas = Gas(35_000_000_000_000);
 
