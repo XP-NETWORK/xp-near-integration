@@ -16,6 +16,7 @@ pub use crate::external::*;
 const GAS_FOR_FREEZE_NFT: Gas = Gas(35_000_000_000_000);
 const GAS_FOR_WITHDRAW_NFT: Gas = Gas(35_000_000_000_000);
 const GAS_FOR_VALIDATE_TRANSFER: Gas = Gas(30_000_000_000_000);
+const GAS_FOR_VALIDATE_WITHDRAW: Gas = Gas(30_000_000_000_000);
 const GAS_FOR_VALIDATE_UNFREEZE: Gas = Gas(35_000_000_000_000);
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -161,6 +162,7 @@ impl XpBridge {
     /// REQUIRED: Signature verification.
     pub fn validate_withdraw_fees(&mut self, data: WithdrawFeeData, sig_data: Vec<u8>) -> Promise {
         require!(!self.paused, "paused");
+        require!(env::prepaid_gas() > GAS_FOR_VALIDATE_WITHDRAW, "Not enough gas");
 
         self.require_sig(
             data.action_id.into(),
@@ -173,7 +175,9 @@ impl XpBridge {
         let amt = env::account_balance() - storage_used as u128 * env::storage_byte_cost();
         Promise::new(data.account_id)
             .transfer(amt)
-            .then(Self::ext(env::current_account_id()).withdraw_fee_callback(data.action_id.0))
+            .then(Self::ext(env::current_account_id())
+            .with_static_gas(Gas(TGAS * 15))
+            .withdraw_fee_callback(data.action_id.0))
     }
 
     /// This is the callback function when the promise in the
