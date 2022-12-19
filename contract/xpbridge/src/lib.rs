@@ -372,7 +372,9 @@ impl XpBridge {
     ) -> Promise {
         require!(call_result.is_ok(), "token callback failed");
 
-        xpnft::ext(token_contract.clone())
+        match call_result {
+            Ok(_) => {
+                xpnft::ext(token_contract.clone())
             .with_static_gas(Gas(TGAS * 10))
             .nft_burn(token_id.clone(), owner_id)
             .then(
@@ -387,6 +389,14 @@ impl XpBridge {
                         env::predecessor_account_id(),
                     ),
             )
+            },
+            Err(_) => {
+                // Return funds
+                Promise::new(env::signer_account_id()).transfer(amt)
+            }
+        }
+
+        
     }
 
     /// This is the callback function when the promise in the token_callback
