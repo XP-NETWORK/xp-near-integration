@@ -373,8 +373,6 @@ impl XpBridge {
         amt: u128,
         #[callback_result] call_result: Result<Option<Token>, PromiseError>,
     ) -> Promise {
-        require!(call_result.is_ok(), "token callback failed");
-
         match call_result {
             Ok(_) => {
                 xpnft::ext(token_contract.clone())
