@@ -2,10 +2,10 @@ use ed25519_compact::{PublicKey, Signature};
 use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::Token;
 use near_contract_standards::non_fungible_token::TokenId;
-use near_sdk::ONE_NEAR;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::ONE_NEAR;
 use near_sdk::{env, near_bindgen, require, AccountId, Gas, Promise, PromiseError};
 use sha2::{Digest, Sha512};
 use std::collections::HashMap;
@@ -176,7 +176,8 @@ impl XpBridge {
         );
 
         let storage_used = env::storage_usage();
-        let amt = (env::account_balance() - storage_used as u128 * env::storage_byte_cost()) - ONE_NEAR; 
+        let amt =
+            (env::account_balance() - storage_used as u128 * env::storage_byte_cost()) - ONE_NEAR;
         Promise::new(data.account_id).transfer(amt).then(
             Self::ext(env::current_account_id())
                 .with_static_gas(Gas(TGAS * 15))
@@ -196,7 +197,10 @@ impl XpBridge {
         match call_result {
             Err(e) => {
                 self.consumed_actions.remove(&action_id);
-                env::log_str(&format!("validate transfer callback: failed to transfer tokens: {:?}", e))
+                env::log_str(&format!(
+                    "validate transfer callback: failed to transfer tokens: actionid: {} : {:?}",
+                    action_id, e
+                ))
             }
             Ok(_) => {
                 // Do nothing
@@ -315,7 +319,11 @@ impl XpBridge {
             }
             Err(e) => {
                 self.consumed_actions.remove(&action_id);
-                env::log_str(&format!("validate transfer callback: failed to mint nft: {:?}", e))
+                env::log_str(&format!(
+                    "validate transfer callback: failed to mint nft: actionid: {} : {:?}",
+                    action_id, 
+                    e
+                ))
             }
         };
     }
@@ -374,30 +382,26 @@ impl XpBridge {
         #[callback_result] call_result: Result<Option<Token>, PromiseError>,
     ) -> Promise {
         match call_result {
-            Ok(_) => {
-                xpnft::ext(token_contract.clone())
-            .with_static_gas(Gas(TGAS * 10))
-            .nft_burn(token_id.clone(), owner_id)
-            .then(
-                Self::ext(env::current_account_id())
-                    .with_static_gas(Gas(TGAS * 10))
-                    .withdraw_callback(
-                        token_contract,
-                        call_result.unwrap(),
-                        chain_nonce,
-                        to,
-                        amt.into(),
-                        env::predecessor_account_id(),
-                    ),
-            )
-            },
+            Ok(_) => xpnft::ext(token_contract.clone())
+                .with_static_gas(Gas(TGAS * 10))
+                .nft_burn(token_id.clone(), owner_id)
+                .then(
+                    Self::ext(env::current_account_id())
+                        .with_static_gas(Gas(TGAS * 10))
+                        .withdraw_callback(
+                            token_contract,
+                            call_result.unwrap(),
+                            chain_nonce,
+                            to,
+                            amt.into(),
+                            env::predecessor_account_id(),
+                        ),
+                ),
             Err(_) => {
                 // Return funds
                 Promise::new(env::signer_account_id()).transfer(amt)
             }
         }
-
-        
     }
 
     /// This is the callback function when the promise in the token_callback
@@ -431,7 +435,11 @@ impl XpBridge {
             }
             Err(e) => {
                 Promise::new(sender).transfer(amt);
-                env::log_str(&format!("validate withdraw callback: failed to burn nft: {:?}", e))
+                env::log_str(&format!(
+                    "validate withdraw callback: failed to burn nft:  actionid: {} : {:?}",
+                    self.action_cnt,
+                    e
+                ))
             }
         }
     }
@@ -476,7 +484,7 @@ impl XpBridge {
                         to,
                         mint_with,
                         env::attached_deposit(),
-                        env::predecessor_account_id()
+                        env::predecessor_account_id(),
                     ),
             )
     }
@@ -515,7 +523,7 @@ impl XpBridge {
             }
             Err(e) => {
                 Promise::new(sender).transfer(amt);
-                env::log_str(&format!("freeze callback: failed to transfer nft: {:?}", e))
+                env::log_str(&format!("freeze callback: failed to transfer nft:  actionid: {} : {:?}",self.action_cnt, e))
             }
         }
     }
@@ -568,7 +576,11 @@ impl XpBridge {
             }
             Err(e) => {
                 self.consumed_actions.remove(&action_id);
-                env::log_str(&format!("validate unfreeze callback: failed to transfer nft: {:?}", e))
+                env::log_str(&format!(
+                    "validate unfreeze callback: failed to transfer nft: action id: {}: {:?}",
+                    action_id,
+                    e
+                ))
             }
         };
     }
