@@ -194,8 +194,9 @@ impl XpBridge {
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         match call_result {
-            Err(_e) => {
+            Err(e) => {
                 self.consumed_actions.remove(&action_id);
+                env::log_str(&format!("validate transfer callback: failed to transfer tokens: {:?}", e))
             }
             Ok(_) => {
                 // Do nothing
@@ -312,8 +313,9 @@ impl XpBridge {
             Ok(_) => {
                 // Do Nothing
             }
-            Err(_e) => {
+            Err(e) => {
                 self.consumed_actions.remove(&action_id);
+                env::log_str(&format!("validate transfer callback: failed to mint nft: {:?}", e))
             }
         };
     }
@@ -429,8 +431,9 @@ impl XpBridge {
                 }
                 .emit();
             }
-            Err(_e) => {
+            Err(e) => {
                 Promise::new(sender).transfer(amt);
+                env::log_str(&format!("validate withdraw callback: failed to burn nft: {:?}", e))
             }
         }
     }
@@ -512,8 +515,9 @@ impl XpBridge {
                 }
                 .emit();
             }
-            Err(_e) => {
+            Err(e) => {
                 Promise::new(sender).transfer(amt);
+                env::log_str(&format!("freeze callback: failed to transfer nft: {:?}", e))
             }
         }
     }
@@ -564,8 +568,9 @@ impl XpBridge {
             Ok(_) => {
                 // Do Nothing
             }
-            Err(_e) => {
+            Err(e) => {
                 self.consumed_actions.remove(&action_id);
+                env::log_str(&format!("validate unfreeze callback: failed to transfer nft: {:?}", e))
             }
         };
     }
