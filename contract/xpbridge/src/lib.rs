@@ -2,6 +2,7 @@ use ed25519_compact::{PublicKey, Signature};
 use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::Token;
 use near_contract_standards::non_fungible_token::TokenId;
+use near_sdk::ONE_NEAR;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
@@ -175,7 +176,7 @@ impl XpBridge {
         );
 
         let storage_used = env::storage_usage();
-        let amt = env::account_balance() - storage_used as u128 * env::storage_byte_cost();
+        let amt = (env::account_balance() - storage_used as u128 * env::storage_byte_cost()) - ONE_NEAR; 
         Promise::new(data.account_id).transfer(amt).then(
             Self::ext(env::current_account_id())
                 .with_static_gas(Gas(TGAS * 15))
