@@ -413,8 +413,6 @@ impl XpBridge {
         sender: AccountId,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
-        require!(call_result.is_ok(), "withdraw failed");
-
         match call_result {
             Ok(_) => {
                 self.action_cnt += 1;
