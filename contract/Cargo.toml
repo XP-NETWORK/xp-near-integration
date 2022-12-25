@@ -9,5 +9,6 @@ overflow-checks = true
 [workspace]
 members = [
     "xpnft",
-    "xpbridge"
+    "xpbridge",
+    "currency-data-oracle"
 ]

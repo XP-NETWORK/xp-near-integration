@@ -1,0 +1,16 @@
+[package]
+name = "currency-data-oracle"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+near-sdk = "4.0.0"
+ed25519-compact = { version = "2.0.4", default-features=false }
+sha2 = "*"
+
+[dev-dependencies]
+ed25519-dalek = { version = "1.0.1", features = ["std", "rand"] }
+rand_core = { version = "0.5.1", features = ["getrandom"] }

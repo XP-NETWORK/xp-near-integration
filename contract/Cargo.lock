@@ -281,6 +281,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "currency-data-oracle"
+version = "0.1.0"
+dependencies = [
+ "ed25519-compact 2.0.4",
+ "ed25519-dalek",
+ "near-sdk",
+ "rand_core 0.5.1",
+ "sha2 0.9.9",
+]
+
+[[package]]
 name = "curve25519-dalek"
 version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -345,6 +356,12 @@ name = "ed25519-compact"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24e1f30f0312ac83726c1197abeacd91c9557f8a623e904a009ae6bc529ae8d8"
+
+[[package]]
+name = "ed25519-compact"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a3d382e8464107391c8706b4c14b087808ecb909f6c15c34114bc42e53a9e4c"
 
 [[package]]
 name = "ed25519-dalek"
@@ -1313,12 +1330,12 @@ checksum = "85e60b0d1b5f99db2556934e21937020776a5d31520bf169e851ac44e6420214"
 name = "xpbridge"
 version = "0.1.0"
 dependencies = [
- "ed25519-compact",
+ "ed25519-compact 1.0.11",
  "ed25519-dalek",
  "near-contract-standards",
  "near-sdk",
  "rand_core 0.5.1",
- "sha2 0.9.9",
+ "sha2 0.10.5",
 ]
 
 [[package]]
