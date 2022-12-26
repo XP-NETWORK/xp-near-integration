@@ -192,4 +192,19 @@ impl CurrencyDataOracle {
         let data = UpdatePriceData { price, action_id };
         data.try_to_vec().unwrap()
     }
+    /// Encodes the UpdateGroupkeyData struct into a vector of bytes.
+    /// This should be done in the client side but i cant find 
+    /// a way to acoomplish this with borsh-ts so we do it here.
+    pub fn encode_update_group_key(&self, group_key: [u8; 32], action_id: U128) -> Vec<u8> {
+        let data = UpdateGroupkeyData { group_key, action_id };
+        data.try_to_vec().unwrap()
+    }
+
+    /// Encodes the AddDecimalData struct into a vector of bytes.
+    /// This should be done in the client side but i cant find 
+    /// a way to acoomplish this with borsh-ts so we do it here.
+    pub fn encode_add_decimal_data(&self, nonce: u16, decimal: U128, action_id: U128) -> Vec<u8> {
+        let data = AddDecimalData { nonce, decimal, action_id };
+        data.try_to_vec().unwrap()
+    }
 }
