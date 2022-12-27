@@ -1,3 +1,4 @@
+use near_bigint::U256;
 use near_contract_standards::non_fungible_token::{metadata::TokenMetadata, Token, TokenId};
 use near_sdk::{ext_contract, AccountId, Promise};
 
@@ -27,4 +28,9 @@ pub trait CommonNft {
         approval_id: Option<u64>,
         memo: Option<String>,
     );
+}
+
+#[ext_contract(currency_data_oracle)]
+pub trait CurrencyDataOracle {
+    fn estimate_fees(&self, from: u16, to: u16) -> U256;
 }

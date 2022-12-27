@@ -286,9 +286,10 @@ version = "0.1.0"
 dependencies = [
  "ed25519-compact 2.0.4",
  "ed25519-dalek",
+ "near-bigint",
  "near-sdk",
  "rand_core 0.5.1",
- "sha2 0.9.9",
+ "sha2 0.10.5",
 ]
 
 [[package]]
@@ -532,6 +533,17 @@ checksum = "de83d74a9241be8cc4eb3055216966b58bf8c463e8e285c0dc553925acdd19fa"
 dependencies = [
  "borsh",
  "serde",
+]
+
+[[package]]
+name = "near-bigint"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9c9b544d859cdced14c1f441c55fe419f1fc49c37e798c79b683f9b54a7fdb3"
+dependencies = [
+ "near-sdk",
+ "paste",
+ "uint",
 ]
 
 [[package]]
@@ -803,6 +815,12 @@ dependencies = [
  "cfg-if 0.1.10",
  "rand 0.7.3",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d01a5bd0424d00070b0098dd17ebca6f961a959dead1dbcbbbc1d1cd8d3deeba"
 
 [[package]]
 name = "ppv-lite86"
@@ -1332,6 +1350,7 @@ version = "0.1.0"
 dependencies = [
  "ed25519-compact 1.0.11",
  "ed25519-dalek",
+ "near-bigint",
  "near-contract-standards",
  "near-sdk",
  "rand_core 0.5.1",
