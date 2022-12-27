@@ -1,6 +1,6 @@
 use ed25519_compact::{PublicKey, Signature};
+use near_bigint::U256;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{env, near_bindgen, require};
 use sha2::{Digest, Sha512};
@@ -9,14 +9,14 @@ use std::collections::HashMap;
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct UpdatePriceData {
-    price: HashMap<u16, U128>, // chain_nonce -> price
-    action_id: U128,           // random action id
+    price: HashMap<u16, U256>, // chain_nonce -> price
+    action_id: U256,           // random action id
 }
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct UpdateGroupkeyData {
-    action_id: U128,
+    action_id: U256,
     group_key: [u8; 32],
 }
 
@@ -24,26 +24,28 @@ pub struct UpdateGroupkeyData {
 #[serde(crate = "near_sdk::serde")]
 pub struct AddDecimalData {
     nonce: u16,      // nonce of the chain
-    decimal: U128,   // decimal value in the form of 1e18 for example
-    action_id: U128, // random action id
+    decimal: U256,   // decimal value in the form of 1e18 for example
+    action_id: U256, // random action id
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct CurrencyData {
-    pub from_chain_price: U128,
-    pub to_chain_price: U128,
-    pub from_chain_decimal: U128,
-    pub to_chain_decimal: U128,
+    pub from_chain_price: U256,
+    pub to_chain_price: U256,
+    pub from_chain_decimal: U256,
+    pub to_chain_decimal: U256,
 }
 
 #[near_bindgen]
 #[derive(Default, BorshDeserialize, BorshSerialize)]
 pub struct CurrencyDataOracle {
-    price_data: HashMap<u16, U128>,        // chain_nonce -> price
+    price_data: HashMap<u16, U256>,        // chain_nonce -> price
     group_key: [u8; 32],                   // group key for signature verification
     consumed_actions: HashMap<u128, bool>, // action_id -> bool
-    decimals: HashMap<u16, U128>,          // chain_nonce -> decimal value
+    decimals: HashMap<u16, U256>,          // chain_nonce -> decimal value
+    chain_tx_fee_data: HashMap<u16, U256>, // chain_nonce -> tx fee
+    other_fees: HashMap<u16, U256>, // chain_nonce -> other fees (for future proofing, extra fee in chains)
 }
 
 #[near_bindgen]
@@ -54,8 +56,10 @@ impl CurrencyDataOracle {
     #[init]
     pub fn initialize(
         group_key: [u8; 32],
-        decimals: HashMap<u16, U128>,
-        initial_price_data: HashMap<u16, U128>,
+        decimals: HashMap<u16, U256>,
+        price_data: HashMap<u16, U256>,
+        chain_tx_fee_data: HashMap<u16, U256>,
+        other_fees: HashMap<u16, U256>,
     ) -> Self {
         assert!(
             env::current_account_id() == env::predecessor_account_id(),
@@ -65,9 +69,11 @@ impl CurrencyDataOracle {
         assert!(!env::state_exists(), "Already initialized");
 
         Self {
-            price_data: initial_price_data,
+            price_data,
             group_key,
             decimals,
+            chain_tx_fee_data,
+            other_fees,
             consumed_actions: HashMap::new(),
         }
     }
@@ -95,7 +101,7 @@ impl CurrencyDataOracle {
     /// Updates the price data in the state of the contract.
     pub fn validate_update_prices(&mut self, data: UpdatePriceData, sig_data: Vec<u8>) {
         self.require_sig(
-            data.action_id.into(),
+            data.action_id.as_u128(),
             data.try_to_vec().unwrap(),
             sig_data,
             b"UpdatePriceData",
@@ -107,7 +113,7 @@ impl CurrencyDataOracle {
     /// Updates the decimal data in the state of the contract.
     pub fn validate_add_decimal(&mut self, data: AddDecimalData, sig_data: Vec<u8>) {
         self.require_sig(
-            data.action_id.into(),
+            data.action_id.as_u128(),
             data.try_to_vec().unwrap(),
             sig_data,
             b"AddDecimalData",
@@ -117,7 +123,7 @@ impl CurrencyDataOracle {
     }
 
     /// Get Price Data for the given nonces.
-    pub fn get_price_data(&self, from_nonce: u16, to_nonce: u16) -> HashMap<u16, U128> {
+    pub fn get_price_data(&self, from_nonce: u16, to_nonce: u16) -> HashMap<u16, U256> {
         let mut res = HashMap::new();
         let from = self.price_data.get(&from_nonce).unwrap();
         let to = self.price_data.get(&to_nonce).unwrap();
@@ -127,7 +133,7 @@ impl CurrencyDataOracle {
     }
 
     /// Get Price Data for the given nonces.
-    pub fn get_decimal_data(&self, from_nonce: u16, to_nonce: u16) -> HashMap<u16, U128> {
+    pub fn get_decimal_data(&self, from_nonce: u16, to_nonce: u16) -> HashMap<u16, U256> {
         let mut res = HashMap::new();
         let from = self.decimals.get(&from_nonce).unwrap();
         let to = self.decimals.get(&to_nonce).unwrap();
@@ -161,7 +167,7 @@ impl CurrencyDataOracle {
     /// Updates the group key in the state of the contract.
     pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
         self.require_sig(
-            data.action_id.into(),
+            data.action_id.as_u128(),
             data.try_to_vec().unwrap(),
             sig_data,
             b"SetGroupKey",
@@ -170,41 +176,99 @@ impl CurrencyDataOracle {
         self.group_key = data.group_key;
     }
 
+    /// Estimates the fees for the given chains.
+    /// Returns the estimated fees in to_chain currency and decimals.
+    /// The fees are calculated as follows:
+    /// 1. Get the tx fee for the to_chain.
+    /// 2. Get the conversion rate for the to_chain.
+    /// 3. Multiply the tx fee with the conversion rate.
+    /// 4. Now in this fee (in USD), add our commission fees.
+    /// 5. Now convert this fee back into from_chain currency.
+    pub fn estimate_fees(&self, from: u16, to: u16) -> U256 {
+        let from_dec = self
+            .decimals
+            .get(&from)
+            .expect("Failed to get decimal for from chain");
+        let to_dec = self
+            .decimals
+            .get(&to)
+            .expect("Failed to get decimal for to chain");
+
+        let from_conv_rate = self
+            .price_data
+            .get(&from)
+            .expect("Failed to get conv data for from chain");
+        let to_conv_rate = self
+            .price_data
+            .get(&to)
+            .expect("Failed to get conv data for to chain");
+
+        let to_tx_fee = self
+            .chain_tx_fee_data
+            .get(&to)
+            .expect("Failed to get tx fee data for to chain")
+            + self.other_fees.get(&to).unwrap_or(&U256::zero());
+
+        let fee_in_usd = to_tx_fee * to_conv_rate;
+
+        let fee_in_usd_with_commission = fee_in_usd * (to_dec / 2); // + 0.5 USD
+
+        let fee_in_from_currency = (fee_in_usd_with_commission * from_dec) / from_conv_rate;
+
+        fee_in_from_currency
+    }
+
     /// Get the group key from the state of the contract.
     pub fn get_group_key(&self) -> [u8; 32] {
         self.group_key
     }
 
     /// Gets the price data from the state of the contract for all the chains.
-    pub fn get_all_price_data(&self) -> HashMap<u16, U128> {
+    pub fn get_all_price_data(&self) -> HashMap<u16, U256> {
         self.price_data.clone()
     }
 
     /// Gets the decimal data from the state of the contract for all the chains.
-    pub fn get_all_decimal_data(&self) -> HashMap<u16, U128> {
+    pub fn get_all_decimal_data(&self) -> HashMap<u16, U256> {
         self.price_data.clone()
     }
 
+    /// Gets the tx fee data from the state of the contract for all the chains.
+    pub fn get_all_tx_fee_data(&self) -> HashMap<u16, U256> {
+        self.chain_tx_fee_data.clone()
+    }
+    /// Gets the tx fee data from the state of the contract for all the chains.
+    pub fn get_all_other_fee_data(&self) -> HashMap<u16, U256> {
+        self.other_fees.clone()
+    }
+
     /// Encodes the UpdatePriceData struct into a vector of bytes.
-    /// This should be done in the client side but i cant find 
+    /// This should be done in the client side but i cant find
     /// a way to acoomplish this with borsh-ts so we do it here.
-    pub fn encode_update_price_data(&self, price: HashMap<u16, U128>, action_id: U128) -> Vec<u8> {
+    pub fn encode_update_price_data(&self, price: HashMap<u16, U256>, action_id: U256) -> Vec<u8> {
         let data = UpdatePriceData { price, action_id };
         data.try_to_vec().unwrap()
     }
     /// Encodes the UpdateGroupkeyData struct into a vector of bytes.
-    /// This should be done in the client side but i cant find 
+    /// This should be done in the client side but i cant find
     /// a way to acoomplish this with borsh-ts so we do it here.
-    pub fn encode_update_group_key(&self, group_key: [u8; 32], action_id: U128) -> Vec<u8> {
-        let data = UpdateGroupkeyData { group_key, action_id };
+    pub fn encode_update_group_key(&self, group_key: [u8; 32], action_id: U256) -> Vec<u8> {
+        let data = UpdateGroupkeyData {
+            group_key,
+            action_id,
+        };
         data.try_to_vec().unwrap()
     }
 
     /// Encodes the AddDecimalData struct into a vector of bytes.
-    /// This should be done in the client side but i cant find 
+    /// This should be done in the client side but i cant find
     /// a way to acoomplish this with borsh-ts so we do it here.
-    pub fn encode_add_decimal_data(&self, nonce: u16, decimal: U128, action_id: U128) -> Vec<u8> {
-        let data = AddDecimalData { nonce, decimal, action_id };
+    pub fn encode_add_decimal_data(&self, nonce: u16, decimal: U256, action_id: U256) -> Vec<u8> {
+        let data = AddDecimalData {
+            nonce,
+            decimal,
+            action_id,
+        };
         data.try_to_vec().unwrap()
     }
 }
