@@ -8,8 +8,8 @@ use std::collections::HashMap;
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
-pub struct UpdatePriceData {
-    price: HashMap<u16, U256>, // chain_nonce -> price
+pub struct UpdateData {
+    new_data: HashMap<u16, U256>, // chain_nonce -> price
     action_id: U256,           // random action id
 }
 
@@ -99,15 +99,39 @@ impl CurrencyDataOracle {
     }
 
     /// Updates the price data in the state of the contract.
-    pub fn validate_update_prices(&mut self, data: UpdatePriceData, sig_data: Vec<u8>) {
+    pub fn validate_update_prices(&mut self, data: UpdateData, sig_data: Vec<u8>) {
         self.require_sig(
             data.action_id.as_u128(),
             data.try_to_vec().unwrap(),
             sig_data,
-            b"UpdatePriceData",
+            b"UpdateData",
         );
 
-        self.price_data.extend(data.price.iter());
+        self.price_data.extend(data.new_data.iter());
+    }
+
+    /// Updates the price data in the state of the contract.
+    pub fn validate_update_tx_fees(&mut self, data: UpdateData, sig_data: Vec<u8>) {
+        self.require_sig(
+            data.action_id.as_u128(),
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"UpdateData",
+        );
+
+        self.chain_tx_fee_data.extend(data.new_data.iter());
+    }
+
+    /// Updates the price data in the state of the contract.
+    pub fn validate_update_other_fees(&mut self, data: UpdateData, sig_data: Vec<u8>) {
+        self.require_sig(
+            data.action_id.as_u128(),
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"UpdateData",
+        );
+
+        self.other_fees.extend(data.new_data.iter());
     }
 
     /// Updates the decimal data in the state of the contract.
@@ -164,6 +188,7 @@ impl CurrencyDataOracle {
             )),
         }
     }
+
     /// Updates the group key in the state of the contract.
     pub fn validate_update_group_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
         self.require_sig(
@@ -209,11 +234,11 @@ impl CurrencyDataOracle {
             .expect("Failed to get tx fee data for to chain")
             + self.other_fees.get(&to).unwrap_or(&U256::zero());
 
-        let fee_in_usd = to_tx_fee * to_conv_rate;
+        let fee_in_usd = (to_tx_fee * to_conv_rate) / to_dec;
 
-        let fee_in_usd_with_commission = fee_in_usd * (to_dec / 2); // + 0.5 USD
+        let fee_in_usd_with_commission = fee_in_usd + (to_dec / 2); // + 0.5 USD
 
-        let fee_in_from_currency = (fee_in_usd_with_commission * from_dec) / from_conv_rate;
+        let fee_in_from_currency = (fee_in_usd_with_commission * from_dec) / from_conv_rate * (from_dec / to_dec);
 
         fee_in_from_currency
     }
@@ -237,16 +262,17 @@ impl CurrencyDataOracle {
     pub fn get_all_tx_fee_data(&self) -> HashMap<u16, U256> {
         self.chain_tx_fee_data.clone()
     }
+
     /// Gets the tx fee data from the state of the contract for all the chains.
     pub fn get_all_other_fee_data(&self) -> HashMap<u16, U256> {
         self.other_fees.clone()
     }
 
-    /// Encodes the UpdatePriceData struct into a vector of bytes.
+    /// Encodes the UpdateData struct into a vector of bytes.
     /// This should be done in the client side but i cant find
     /// a way to acoomplish this with borsh-ts so we do it here.
-    pub fn encode_update_price_data(&self, price: HashMap<u16, U256>, action_id: U256) -> Vec<u8> {
-        let data = UpdatePriceData { price, action_id };
+    pub fn encode_update_data(&self, new_data: HashMap<u16, U256>, action_id: U256) -> Vec<u8> {
+        let data = UpdateData { new_data, action_id };
         data.try_to_vec().unwrap()
     }
     /// Encodes the UpdateGroupkeyData struct into a vector of bytes.
