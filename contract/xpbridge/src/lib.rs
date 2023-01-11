@@ -361,6 +361,7 @@ impl XpBridge {
             );
     }
 
+    #[private]
     pub fn check_enough_fees_callback_for_withdraw(
         &self,
         token_contract: AccountId,
@@ -514,6 +515,7 @@ impl XpBridge {
             )
     }
 
+    #[private]
     pub fn check_enough_fees_callback_for_transfer(
         &mut self,
         token_contract: AccountId,
