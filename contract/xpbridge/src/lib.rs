@@ -16,8 +16,8 @@ pub mod external;
 pub use crate::events::*;
 pub use crate::external::*;
 
-const GAS_FOR_FREEZE_NFT: Gas = Gas(35_000_000_000_000);
-const GAS_FOR_WITHDRAW_NFT: Gas = Gas(35_000_000_000_000);
+const GAS_FOR_FREEZE_NFT: Gas = Gas(45_000_000_000_000);
+const GAS_FOR_WITHDRAW_NFT: Gas = Gas(45_000_000_000_000);
 const GAS_FOR_VALIDATE_TRANSFER: Gas = Gas(30_000_000_000_000);
 const GAS_FOR_VALIDATE_WITHDRAW: Gas = Gas(30_000_000_000_000);
 const GAS_FOR_VALIDATE_UNFREEZE: Gas = Gas(35_000_000_000_000);
@@ -348,6 +348,7 @@ impl XpBridge {
         require!(!self.paused, "paused");
 
         currency_data_oracle::ext(self.fees_oracle.clone())
+            .with_static_gas(Gas(TGAS * 5))
             .estimate_fees(31, chain_nonce.into())
             .then(
                 Self::ext(env::current_account_id()).check_enough_fees_callback_for_withdraw(
@@ -501,6 +502,7 @@ impl XpBridge {
         require!(!self.paused, "paused");
 
         currency_data_oracle::ext(self.fees_oracle.clone())
+            .with_static_gas(Gas(TGAS * 5))
             .estimate_fees(31, chain_nonce.into())
             .then(
                 Self::ext(env::current_account_id()).check_enough_fees_callback_for_transfer(
