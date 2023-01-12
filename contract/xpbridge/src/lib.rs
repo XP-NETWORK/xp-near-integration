@@ -4,13 +4,13 @@ use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::Token;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::collections::UnorderedSet;
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::PanicOnDefault;
 use near_sdk::ONE_NEAR;
 use near_sdk::{env, near_bindgen, require, AccountId, Gas, Promise, PromiseError};
 use sha2::{Digest, Sha512};
-use std::collections::HashMap;
 pub mod events;
 pub mod external;
 pub use crate::events::*;
@@ -77,12 +77,12 @@ pub struct UnfreezeNftData {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct XpBridge {
-    consumed_actions: HashMap<u128, bool>,
+    consumed_actions: UnorderedSet<u128>,
     paused: bool,
     tx_fees: u128,
     group_key: [u8; 32],
     action_cnt: u128,
-    whitelist: HashMap<String, bool>,
+    whitelist: UnorderedSet<String>,
     fees_oracle: AccountId,
 }
 
@@ -99,12 +99,12 @@ impl XpBridge {
         );
 
         Self {
-            consumed_actions: HashMap::new(),
+            consumed_actions: UnorderedSet::new(b"c"),
             paused: false,
             tx_fees: 0,
             group_key,
             action_cnt: 0,
-            whitelist: HashMap::new(),
+            whitelist: UnorderedSet::new(b"w"),
             fees_oracle,
         }
     }
@@ -113,10 +113,10 @@ impl XpBridge {
     /// Signature check for bridge actions.
     /// Consumes the passed action_id.
     fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>, context: &[u8]) {
-        let f = self.consumed_actions.contains_key(&action_id);
+        let f = self.consumed_actions.contains(&action_id);
         require!(!f, "Duplicated Action");
 
-        self.consumed_actions.insert(action_id, true);
+        self.consumed_actions.insert(&action_id);
 
         let mut hasher = Sha512::new();
         hasher.update(context);
@@ -240,7 +240,7 @@ impl XpBridge {
         require!(
             !self
                 .whitelist
-                .contains_key(&data.token_contract.to_string()),
+                .contains(&data.token_contract.to_string()),
             "Already whitelist"
         );
 
@@ -251,7 +251,7 @@ impl XpBridge {
             b"WhitelistNft",
         );
 
-        self.whitelist.insert(data.token_contract, true);
+        self.whitelist.insert(&data.token_contract);
     }
     /// Updates the whitelist for the contract.
     /// Removes the provided account_id from the whitelist
@@ -264,7 +264,7 @@ impl XpBridge {
 
         require!(
             self.whitelist
-                .contains_key(&data.token_contract.to_string()),
+                .contains(&data.token_contract.to_string()),
             "Not whitelist"
         );
 
@@ -534,7 +534,7 @@ impl XpBridge {
                 if amt >= fee.as_u128() {
                     require!(
                         self.whitelist
-                            .contains_key(&token_contract.clone().to_string()),
+                            .contains(&token_contract.clone().to_string()),
                         "Not whitelist"
                     );
 
@@ -627,7 +627,7 @@ impl XpBridge {
 
         require!(
             self.whitelist
-                .contains_key(&data.token_contract.clone().to_string()),
+                .contains(&data.token_contract.clone().to_string()),
             "Not whitelist"
         );
 
@@ -736,7 +736,7 @@ impl XpBridge {
     /// or not.
     /// Returns boolean
     pub fn is_whitelist(&self, contract_id: String) -> bool {
-        self.whitelist.contains_key(&contract_id)
+        self.whitelist.contains(&contract_id)
     }
 
     /// Checks if the contract is paused or not.
