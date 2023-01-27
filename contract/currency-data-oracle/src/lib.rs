@@ -132,7 +132,7 @@ impl CurrencyDataOracle {
             data.action_id.as_u128(),
             data.try_to_vec().unwrap(),
             sig_data,
-            b"AddDecimalData",
+            b"UpdateData",
         );
 
         self.decimals.extend(data.new_data.iter());
