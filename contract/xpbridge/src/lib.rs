@@ -238,9 +238,7 @@ impl XpBridge {
         require!(!self.paused, "paused");
 
         require!(
-            !self
-                .whitelist
-                .contains(&data.token_contract.to_string()),
+            !self.whitelist.contains(&data.token_contract.to_string()),
             "Already whitelist"
         );
 
@@ -263,8 +261,7 @@ impl XpBridge {
         require!(!self.paused, "paused");
 
         require!(
-            self.whitelist
-                .contains(&data.token_contract.to_string()),
+            self.whitelist.contains(&data.token_contract.to_string()),
             "Not whitelist"
         );
 
@@ -371,11 +368,12 @@ impl XpBridge {
         to: String,
         amt: u128,
         sender: AccountId,
-        #[callback_result] call_result: Result<U256, PromiseError>,
+        #[callback_result] call_result: Result<Option<U256>, PromiseError>,
     ) {
         match call_result {
             Ok(fee) => {
-                if amt >= fee.as_u128() {
+                let est = fee.unwrap_or(U256::from(0));
+                if amt >= est.as_u128() {
                     xpnft::ext(token_contract.clone())
                         .with_static_gas(Gas(TGAS * 10))
                         .nft_token(token_id.clone())
@@ -527,14 +525,14 @@ impl XpBridge {
         mint_with: String,
         amt: u128,
         sender: AccountId,
-        #[callback_result] call_result: Result<U256, PromiseError>,
+        #[callback_result] call_result: Result<Option<U256>, PromiseError>,
     ) {
         match call_result {
             Ok(fee) => {
-                if amt >= fee.as_u128() {
+                let est = fee.unwrap_or(U256::from(0));
+                if amt >= est.as_u128() {
                     require!(
-                        self.whitelist
-                            .contains(&token_contract.clone().to_string()),
+                        self.whitelist.contains(&token_contract.clone().to_string()),
                         "Not whitelist"
                     );
 

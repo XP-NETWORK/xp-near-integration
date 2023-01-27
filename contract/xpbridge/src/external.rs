@@ -32,5 +32,5 @@ pub trait CommonNft {
 
 #[ext_contract(currency_data_oracle)]
 pub trait CurrencyDataOracle {
-    fn estimate_fees(&self, from: u16, to: u16) -> U256;
+    fn estimate_fees(&self, from: u16, to: u16) -> Option<U256>;
 }
