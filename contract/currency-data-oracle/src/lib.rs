@@ -20,14 +20,6 @@ pub struct UpdateGroupkeyData {
     group_key: [u8; 32],
 }
 
-#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
-#[serde(crate = "near_sdk::serde")]
-pub struct AddDecimalData {
-    nonce: u16,      // nonce of the chain
-    decimal: U256,   // decimal value in the form of 1e18 for example
-    action_id: U256, // random action id
-}
-
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct CurrencyData {
@@ -135,7 +127,7 @@ impl CurrencyDataOracle {
     }
 
     /// Updates the decimal data in the state of the contract.
-    pub fn validate_add_decimal(&mut self, data: AddDecimalData, sig_data: Vec<u8>) {
+    pub fn validate_update_decimal(&mut self, data: UpdateData, sig_data: Vec<u8>) {
         self.require_sig(
             data.action_id.as_u128(),
             data.try_to_vec().unwrap(),
@@ -143,7 +135,7 @@ impl CurrencyDataOracle {
             b"AddDecimalData",
         );
 
-        self.decimals.insert(data.nonce, data.decimal);
+        self.decimals.extend(data.new_data.iter());
     }
 
     /// Get Price Data for the given nonces.
@@ -287,18 +279,6 @@ impl CurrencyDataOracle {
     pub fn encode_update_group_key(&self, group_key: [u8; 32], action_id: U256) -> Vec<u8> {
         let data = UpdateGroupkeyData {
             group_key,
-            action_id,
-        };
-        data.try_to_vec().unwrap()
-    }
-
-    /// Encodes the AddDecimalData struct into a vector of bytes.
-    /// This should be done in the client side but i cant find
-    /// a way to acoomplish this with borsh-ts so we do it here.
-    pub fn encode_add_decimal_data(&self, nonce: u16, decimal: U256, action_id: U256) -> Vec<u8> {
-        let data = AddDecimalData {
-            nonce,
-            decimal,
             action_id,
         };
         data.try_to_vec().unwrap()
