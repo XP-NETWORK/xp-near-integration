@@ -10,7 +10,7 @@ use std::collections::HashMap;
 #[serde(crate = "near_sdk::serde")]
 pub struct UpdateData {
     new_data: HashMap<u16, U256>, // chain_nonce -> price
-    action_id: U256,           // random action id
+    action_id: U256,              // random action id
 }
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -209,38 +209,41 @@ impl CurrencyDataOracle {
     /// 3. Multiply the tx fee with the conversion rate.
     /// 4. Now in this fee (in USD), add our commission fees.
     /// 5. Now convert this fee back into from_chain currency.
-    pub fn estimate_fees(&self, from: u16, to: u16) -> U256 {
-        let from_dec = self
-            .decimals
-            .get(&from)
-            .expect("Failed to get decimal for from chain");
-        let to_dec = self
-            .decimals
-            .get(&to)
-            .expect("Failed to get decimal for to chain");
+    pub fn estimate_fees(&self, from: u16, to: u16) -> Option<U256> {
+        let Some(from_dec) = self.decimals.get(&from) else {
+            env::log_str("Failed to get decimal for from chain");
+            return None;
+        };
+        let Some(to_dec) = self.decimals.get(&to) else {
+            env::log_str("Failed to get decimal for to chain");
+            return None;
+        };
 
-        let from_conv_rate = self
-            .price_data
-            .get(&from)
-            .expect("Failed to get conv data for from chain");
-        let to_conv_rate = self
-            .price_data
-            .get(&to)
-            .expect("Failed to get conv data for to chain");
+        let Some(from_conv_rate) = self.price_data.get(&from) else {
+            env::log_str("Failed to get conv data for from chain");
+            return None;
+        };
 
-        let to_tx_fee = self
-            .chain_tx_fee_data
-            .get(&to)
-            .expect("Failed to get tx fee data for to chain")
-            + self.other_fees.get(&to).unwrap_or(&U256::zero());
+        let Some(to_conv_rate) = self.price_data.get(&to) else {
+            env::log_str("Failed to get conv data for to chain");
+            return None;
+        };
+
+        let Some(tx_fee) = self.chain_tx_fee_data.get(&to) else {
+            env::log_str("Failed to get tx fee data for to chain");
+            return None;
+        };
+
+        let to_tx_fee = tx_fee + self.other_fees.get(&to).unwrap_or(&U256::zero());
 
         let fee_in_usd = (to_tx_fee * to_conv_rate) / to_dec;
 
         let fee_in_usd_with_commission = fee_in_usd + (to_dec / 2); // + 0.5 USD
 
-        let fee_in_from_currency = (fee_in_usd_with_commission * from_dec) / from_conv_rate * (from_dec / to_dec);
+        let fee_in_from_currency =
+            (fee_in_usd_with_commission * from_dec) / from_conv_rate * (from_dec / to_dec);
 
-        fee_in_from_currency
+        Some(fee_in_from_currency)
     }
 
     /// Get the group key from the state of the contract.
@@ -272,7 +275,10 @@ impl CurrencyDataOracle {
     /// This should be done in the client side but i cant find
     /// a way to acoomplish this with borsh-ts so we do it here.
     pub fn encode_update_data(&self, new_data: HashMap<u16, U256>, action_id: U256) -> Vec<u8> {
-        let data = UpdateData { new_data, action_id };
+        let data = UpdateData {
+            new_data,
+            action_id,
+        };
         data.try_to_vec().unwrap()
     }
     /// Encodes the UpdateGroupkeyData struct into a vector of bytes.
