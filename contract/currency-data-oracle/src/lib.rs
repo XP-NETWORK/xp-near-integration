@@ -250,7 +250,7 @@ impl CurrencyDataOracle {
 
     /// Gets the decimal data from the state of the contract for all the chains.
     pub fn get_all_decimal_data(&self) -> HashMap<u16, U256> {
-        self.price_data.clone()
+        self.decimals.clone()
     }
 
     /// Gets the tx fee data from the state of the contract for all the chains.
