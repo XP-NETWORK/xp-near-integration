@@ -73,11 +73,7 @@ impl CurrencyDataOracle {
     /// Ed25519 Signature verification logic.
     /// Signature check for contract state updating actions.
     /// Consumes the passed action_id.
-    fn require_sig(&mut self, action_id: u128, data: Vec<u8>, sig_data: Vec<u8>, context: &[u8]) {
-        let f = self.consumed_actions.contains_key(&action_id);
-        require!(!f, "Duplicated Action");
-
-        self.consumed_actions.insert(action_id, true);
+    fn require_sig(&mut self, _action_id: u128, data: Vec<u8>, sig_data: Vec<u8>, context: &[u8]) {
 
         let mut hasher = Sha512::new();
         hasher.update(context);
