@@ -17,9 +17,9 @@ pub use crate::events::*;
 pub use crate::external::*;
 
 const GAS_FOR_FREEZE_NFT: Gas = Gas(45_000_000_000_000);
-const GAS_FOR_WITHDRAW_NFT: Gas = Gas(45_000_000_000_000);
-const GAS_FOR_VALIDATE_TRANSFER: Gas = Gas(30_000_000_000_000);
-const GAS_FOR_VALIDATE_WITHDRAW: Gas = Gas(30_000_000_000_000);
+const GAS_FOR_WITHDRAW_NFT: Gas = Gas(65_000_000_000_000);
+const GAS_FOR_VALIDATE_TRANSFER: Gas = Gas(35_000_000_000_000);
+const GAS_FOR_VALIDATE_WITHDRAW: Gas = Gas(35_000_000_000_000);
 const GAS_FOR_VALIDATE_UNFREEZE: Gas = Gas(35_000_000_000_000);
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -168,7 +168,7 @@ impl XpBridge {
     pub fn validate_withdraw_fees(&mut self, data: WithdrawFeeData, sig_data: Vec<u8>) -> Promise {
         require!(!self.paused, "paused");
         require!(
-            env::prepaid_gas() > GAS_FOR_VALIDATE_WITHDRAW,
+            env::prepaid_gas() >= GAS_FOR_VALIDATE_WITHDRAW,
             "Not enough gas"
         );
 
@@ -282,7 +282,7 @@ impl XpBridge {
     #[payable]
     pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) -> Promise {
         require!(
-            env::prepaid_gas() > GAS_FOR_VALIDATE_TRANSFER,
+            env::prepaid_gas() >= GAS_FOR_VALIDATE_TRANSFER,
             "Not enough gas"
         );
         require!(!self.paused, "paused");
@@ -341,21 +341,23 @@ impl XpBridge {
         chain_nonce: u8,
         to: String,
     ) {
-        require!(env::prepaid_gas() > GAS_FOR_WITHDRAW_NFT, "Not enough gas");
+        require!(env::prepaid_gas() >= GAS_FOR_WITHDRAW_NFT, "Not enough gas");
         require!(!self.paused, "paused");
 
         currency_data_oracle::ext(self.fees_oracle.clone())
             .with_static_gas(Gas(TGAS * 5))
             .estimate_fees(31, chain_nonce.into())
             .then(
-                Self::ext(env::current_account_id()).check_enough_fees_callback_for_withdraw(
-                    token_contract,
-                    token_id,
-                    chain_nonce,
-                    to,
-                    env::attached_deposit(),
-                    env::signer_account_id(),
-                ),
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 45))
+                    .check_enough_fees_callback_for_withdraw(
+                        token_contract,
+                        token_id,
+                        chain_nonce,
+                        to,
+                        env::attached_deposit(),
+                        env::signer_account_id(),
+                    ),
             );
     }
 
@@ -375,7 +377,7 @@ impl XpBridge {
                 let est = fee.unwrap_or(U256::from(0));
                 if amt >= est.as_u128() {
                     xpnft::ext(token_contract.clone())
-                        .with_static_gas(Gas(TGAS * 10))
+                        .with_static_gas(Gas(5 * TGAS))
                         .nft_token(token_id.clone())
                         .then(
                             Self::ext(env::current_account_id())
@@ -383,7 +385,7 @@ impl XpBridge {
                                 .token_callback(
                                     token_contract,
                                     token_id,
-                                    env::predecessor_account_id(),
+                                    sender,
                                     chain_nonce,
                                     to,
                                     env::attached_deposit(),
@@ -428,7 +430,7 @@ impl XpBridge {
                 .nft_burn(token_id.clone(), owner_id)
                 .then(
                     Self::ext(env::current_account_id())
-                        .with_static_gas(Gas(TGAS * 10))
+                        .with_static_gas(Gas(TGAS * 8))
                         .withdraw_callback(
                             token_contract,
                             call_result.unwrap(),
@@ -496,22 +498,24 @@ impl XpBridge {
         to: String,
         mint_with: String,
     ) -> Promise {
-        require!(env::prepaid_gas() > GAS_FOR_FREEZE_NFT, "Not enough gas");
+        require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
 
         currency_data_oracle::ext(self.fees_oracle.clone())
             .with_static_gas(Gas(TGAS * 5))
             .estimate_fees(31, chain_nonce.into())
             .then(
-                Self::ext(env::current_account_id()).check_enough_fees_callback_for_transfer(
-                    token_contract,
-                    token_id,
-                    chain_nonce,
-                    to,
-                    mint_with,
-                    env::attached_deposit(),
-                    env::signer_account_id(),
-                ),
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 30))
+                    .check_enough_fees_callback_for_transfer(
+                        token_contract,
+                        token_id,
+                        chain_nonce,
+                        to,
+                        mint_with,
+                        env::attached_deposit(),
+                        env::signer_account_id(),
+                    ),
             )
     }
 
@@ -531,25 +535,25 @@ impl XpBridge {
             Ok(fee) => {
                 let est = fee.unwrap_or(U256::from(0));
                 if amt >= est.as_u128() {
-                    require!(
-                        self.whitelist.contains(&token_contract.clone().to_string()),
-                        "Not whitelist"
-                    );
+                    // require!(
+                    //     self.whitelist.contains(&token_contract.clone().to_string()),
+                    //     "Not whitelist"
+                    // );
 
                     common_nft::ext(token_contract.clone())
                         .with_attached_deposit(1)
-                        .with_static_gas(Gas(TGAS * 15))
+                        .with_static_gas(Gas(TGAS * 10))
                         .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
                         .then(
                             Self::ext(env::current_account_id())
-                                .with_static_gas(Gas(TGAS * 10))
+                                .with_static_gas(Gas(TGAS * 8))
                                 .freeze_callback(
                                     token_contract,
                                     token_id,
                                     chain_nonce,
                                     to,
                                     mint_with,
-                                    env::attached_deposit(),
+                                    amt,
                                     sender,
                                 ),
                         );
@@ -618,7 +622,7 @@ impl XpBridge {
     /// contract.
     pub fn validate_unfreeze_nft(&mut self, data: UnfreezeNftData, sig_data: Vec<u8>) -> Promise {
         require!(
-            env::prepaid_gas() > GAS_FOR_VALIDATE_UNFREEZE,
+            env::prepaid_gas() >= GAS_FOR_VALIDATE_UNFREEZE,
             "Not enough gas"
         );
         require!(!self.paused, "paused");
@@ -637,11 +641,11 @@ impl XpBridge {
         );
 
         common_nft::ext(data.token_contract)
-            .with_static_gas(Gas(TGAS * 20))
+            .with_static_gas(Gas(TGAS * 10))
             .nft_transfer(data.receiver_id, data.token_id, None, None)
             .then(
                 Self::ext(env::current_account_id())
-                    .with_static_gas(Gas(TGAS * 8))
+                    .with_static_gas(Gas(TGAS * 10))
                     .validate_unfreeze_callback(data.action_id.0),
             )
     }
