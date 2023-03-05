@@ -48,6 +48,7 @@ Build the contracts:
 cd contract/
 ./build.sh
 cd ..
+export NEAR_ENV=mainnet
 ```
 
 1. The bridge contract:
@@ -79,7 +80,7 @@ console.log(GK.toString().replace(' ',''));
 near call xpbridge.near initialize '{"group_key":[!!!replace!!!], "fees_oracle":"price_oracle.near"}' --accountId xpbridge.near
 ```
 
-2. XPNFT example:
+1. XPNFT example:
 
 ```bash
 near call xpnft.near initialize '{"owner_id":"xpbridge.near","metadata":{"spec":"nft-1.0.0","name":"StagingXPNFT","symbol":"SXPNFT"}}' --accountId xpnft.near
@@ -105,3 +106,5 @@ B. Run in the terminal
 ```bash
 near call price_oracle.near initialize '{"group_key":[!!!replace!!!],"decimals":{},"price_data":{},"chain_tx_fee_data":{},"other_fees":{}}' --accountId price_oracle.near
 ```
+
+near call prodfeeoracle.near initialize '{"group_key":[131,46,140,108,139,172,103,138,155,165,160,127,192,177,121,119,250,225,34,87,254,239,48,155,32,190,44,170,15,37,187,12],"decimals":{},"price_data":{},"chain_tx_fee_data":{},"other_fees":{}}' --accountId prodfeeoracle.near
