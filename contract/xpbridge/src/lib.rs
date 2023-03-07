@@ -86,7 +86,7 @@ pub struct XpBridge {
     paused: bool,
     tx_fees: u128,
     group_key: [u8; 32],
-    fee_gk: [u8; 32],
+    fee_pk: [u8; 32],
     action_cnt: u128,
     whitelist: UnorderedSet<String>
 }
@@ -97,7 +97,7 @@ impl XpBridge {
     /// Also sets the initial action count, whitelist, and
     /// other contract state variables.
     #[init]
-    pub fn initialize(group_key: [u8; 32], fee_gk: [u8; 32]) -> Self {
+    pub fn initialize(group_key: [u8; 32], fee_pk: [u8; 32]) -> Self {
         assert!(
             env::current_account_id() == env::predecessor_account_id(),
             "Unauthorized"
@@ -106,7 +106,7 @@ impl XpBridge {
         Self {
             consumed_actions: UnorderedSet::new(b"c"),
             paused: false,
-            fee_gk,
+            fee_pk,
             tx_fees: 0,
             group_key,
             action_cnt: 0,
@@ -233,6 +233,18 @@ impl XpBridge {
         self.group_key = data.group_key;
     }
 
+    pub fn validate_update_fee_public_key(&mut self, data: UpdateGroupkeyData, sig_data: Vec<u8>) {
+        require!(!self.paused, "paused");
+
+        self.require_sig(
+            data.action_id.into(),
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"SetFeePublicKey",
+        );
+
+        self.fee_pk = data.group_key;
+    }
     /// Updates the whitelist for the contract.
     /// Adds the provided account_id to the whitelist
     /// so that they can be freezed for transfers to work
@@ -748,7 +760,7 @@ impl XpBridge {
         hasher.update(data.try_to_vec().unwrap());
         let hash = hasher.finalize();
         let sig = Signature::new(sig_data.as_slice().try_into().unwrap());
-        let key = PublicKey::new(self.fee_gk);
+        let key = PublicKey::new(self.fee_pk);
         let _ = key
             .verify(hash, &sig)
             .expect("Amount Signature Verification Failed");
