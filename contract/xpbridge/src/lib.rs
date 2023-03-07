@@ -1,5 +1,4 @@
 use ed25519_compact::{PublicKey, Signature};
-use near_bigint::U256;
 use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
 use near_contract_standards::non_fungible_token::Token;
 use near_contract_standards::non_fungible_token::TokenId;
@@ -55,6 +54,12 @@ pub struct WithdrawFeeData {
     pub account_id: AccountId,
 }
 
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Amount {
+    value: U128,
+}
+
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct TransferNftData {
@@ -81,9 +86,9 @@ pub struct XpBridge {
     paused: bool,
     tx_fees: u128,
     group_key: [u8; 32],
+    fee_gk: [u8; 32],
     action_cnt: u128,
-    whitelist: UnorderedSet<String>,
-    fees_oracle: AccountId,
+    whitelist: UnorderedSet<String>
 }
 
 #[near_bindgen]
@@ -92,7 +97,7 @@ impl XpBridge {
     /// Also sets the initial action count, whitelist, and
     /// other contract state variables.
     #[init]
-    pub fn initialize(group_key: [u8; 32], fees_oracle: AccountId) -> Self {
+    pub fn initialize(group_key: [u8; 32], fee_gk: [u8; 32]) -> Self {
         assert!(
             env::current_account_id() == env::predecessor_account_id(),
             "Unauthorized"
@@ -101,11 +106,11 @@ impl XpBridge {
         Self {
             consumed_actions: UnorderedSet::new(b"c"),
             paused: false,
+            fee_gk,
             tx_fees: 0,
             group_key,
             action_cnt: 0,
             whitelist: UnorderedSet::new(b"w"),
-            fees_oracle,
         }
     }
 
@@ -340,13 +345,18 @@ impl XpBridge {
         token_id: TokenId,
         chain_nonce: u8,
         to: String,
-    ) {
+        sig_data: Vec<u8>,
+    ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_WITHDRAW_NFT, "Not enough gas");
         require!(!self.paused, "paused");
 
-        currency_data_oracle::ext(self.fees_oracle.clone())
-            .with_static_gas(Gas(TGAS * 5))
-            .estimate_fees(31, chain_nonce.into())
+        return Self::ext(env::current_account_id())
+            .verify_paid_amount_by_sig(
+                Amount {
+                    value: env::attached_deposit().into(),
+                },
+                sig_data,
+            )
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(Gas(TGAS * 45))
@@ -370,34 +380,25 @@ impl XpBridge {
         to: String,
         amt: u128,
         sender: AccountId,
-        #[callback_result] call_result: Result<Option<U256>, PromiseError>,
+        #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         match call_result {
-            Ok(fee) => {
-                let est = fee.unwrap_or(U256::from(0));
-                if amt >= est.as_u128() {
-                    xpnft::ext(token_contract.clone())
-                        .with_static_gas(Gas(5 * TGAS))
-                        .nft_token(token_id.clone())
-                        .then(
-                            Self::ext(env::current_account_id())
-                                .with_static_gas(Gas(TGAS * 25))
-                                .token_callback(
-                                    token_contract,
-                                    token_id,
-                                    sender,
-                                    chain_nonce,
-                                    to,
-                                    env::attached_deposit(),
-                                ),
-                        );
-                } else {
-                    Promise::new(sender).transfer(amt);
-                    env::log_str(&format!(
-                        "withdraw callback: failed to transfer nft: not enough fees :actionid: {} : {:?}",
-                        self.action_cnt, call_result
-                    ))
-                }
+            Ok(_) => {
+                xpnft::ext(token_contract.clone())
+                    .with_static_gas(Gas(5 * TGAS))
+                    .nft_token(token_id.clone())
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(Gas(TGAS * 25))
+                            .token_callback(
+                                token_contract,
+                                token_id,
+                                sender,
+                                chain_nonce,
+                                to,
+                                env::attached_deposit(),
+                            ),
+                    );
             }
             Err(e) => {
                 Promise::new(sender).transfer(amt);
@@ -497,13 +498,18 @@ impl XpBridge {
         chain_nonce: u8,
         to: String,
         mint_with: String,
+        sig_data: Vec<u8>,
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
 
-        currency_data_oracle::ext(self.fees_oracle.clone())
-            .with_static_gas(Gas(TGAS * 5))
-            .estimate_fees(31, chain_nonce.into())
+        return Self::ext(env::current_account_id())
+            .verify_paid_amount_by_sig(
+                Amount {
+                    value: env::attached_deposit().into(),
+                },
+                sig_data,
+            )
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(Gas(TGAS * 30))
@@ -516,7 +522,7 @@ impl XpBridge {
                         env::attached_deposit(),
                         env::signer_account_id(),
                     ),
-            )
+            );
     }
 
     #[private]
@@ -529,46 +535,32 @@ impl XpBridge {
         mint_with: String,
         amt: u128,
         sender: AccountId,
-        #[callback_result] call_result: Result<Option<U256>, PromiseError>,
+        #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         match call_result {
-            Ok(fee) => {
-                let est = fee.unwrap_or(U256::from(0));
-                if amt >= est.as_u128() {
-                    // require!(
-                    //     self.whitelist.contains(&token_contract.clone().to_string()),
-                    //     "Not whitelist"
-                    // );
-
-                    common_nft::ext(token_contract.clone())
-                        .with_attached_deposit(1)
-                        .with_static_gas(Gas(TGAS * 10))
-                        .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
-                        .then(
-                            Self::ext(env::current_account_id())
-                                .with_static_gas(Gas(TGAS * 8))
-                                .freeze_callback(
-                                    token_contract,
-                                    token_id,
-                                    chain_nonce,
-                                    to,
-                                    mint_with,
-                                    amt,
-                                    sender,
-                                ),
-                        );
-                } else {
-                    Promise::new(sender).transfer(amt);
-                    env::log_str(&format!(
-                        "freeze callback: failed to transfer nft: not enough fees :actionid: {} : {:?}",
-                        self.action_cnt, call_result
-                    ))
-                }
+            Ok(_) => {
+                common_nft::ext(token_contract.clone())
+                    .with_attached_deposit(1)
+                    .with_static_gas(Gas(TGAS * 10))
+                    .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(Gas(TGAS * 8))
+                            .freeze_callback(
+                                token_contract,
+                                token_id,
+                                chain_nonce,
+                                to,
+                                mint_with,
+                                amt,
+                                sender,
+                            ),
+                    );
             }
             Err(e) => {
                 Promise::new(sender).transfer(amt);
                 env::log_str(&format!(
-                    "freeze callback: failed to transfer nft: failed to get tx fee :actionid: {} : {:?}",
+                    "freeze callback: failed to transfer nft: failed to verify tx fee :actionid: {} : {:?}",
                     self.action_cnt, e
                 ))
             }
@@ -750,4 +742,17 @@ impl XpBridge {
     pub fn get_action_cnt(&self) -> U128 {
         U128(self.action_cnt)
     }
+
+    pub fn verify_paid_amount_by_sig(&self, data: Amount, sig_data: Vec<u8>) {
+        let mut hasher= Sha512::new();
+        hasher.update(data.try_to_vec().unwrap());
+        let hash = hasher.finalize();
+        let sig = Signature::new(sig_data.as_slice().try_into().unwrap());
+        let key = PublicKey::new(self.fee_gk);
+        let _ = key
+            .verify(hash, &sig)
+            .expect("Amount Signature Verification Failed");
+    }
 }
+
+
