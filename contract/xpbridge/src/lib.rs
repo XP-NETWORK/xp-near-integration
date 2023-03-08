@@ -56,8 +56,13 @@ pub struct WithdrawFeeData {
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
-pub struct Amount {
-    value: U128,
+pub struct TransferTx {
+    value: u128,
+    from_chain: u8,
+    to_chain: u8,
+    token_contract: AccountId,
+    token_id: TokenId,
+    to: String,
 }
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
@@ -88,7 +93,7 @@ pub struct XpBridge {
     group_key: [u8; 32],
     fee_pk: [u8; 32],
     action_cnt: u128,
-    whitelist: UnorderedSet<String>
+    whitelist: UnorderedSet<String>,
 }
 
 #[near_bindgen]
@@ -364,8 +369,13 @@ impl XpBridge {
 
         return Self::ext(env::current_account_id())
             .verify_paid_amount_by_sig(
-                Amount {
+                TransferTx {
                     value: env::attached_deposit().into(),
+                    from_chain: 31,
+                    to_chain: chain_nonce,
+                    to: to.clone(),
+                    token_contract: token_contract.clone(),
+                    token_id: token_id.clone(),
                 },
                 sig_data,
             )
@@ -517,8 +527,13 @@ impl XpBridge {
 
         return Self::ext(env::current_account_id())
             .verify_paid_amount_by_sig(
-                Amount {
+                TransferTx {
                     value: env::attached_deposit().into(),
+                    from_chain: 31,
+                    to_chain: chain_nonce,
+                    to: to.clone(),
+                    token_contract: token_contract.clone(),
+                    token_id: token_id.clone(),
                 },
                 sig_data,
             )
@@ -755,8 +770,9 @@ impl XpBridge {
         U128(self.action_cnt)
     }
 
-    pub fn verify_paid_amount_by_sig(&self, data: Amount, sig_data: Vec<u8>) {
-        let mut hasher= Sha512::new();
+    #[private]
+    pub fn verify_paid_amount_by_sig(&self, data: TransferTx, sig_data: Vec<u8>) {
+        let mut hasher = Sha512::new();
         hasher.update(data.try_to_vec().unwrap());
         let hash = hasher.finalize();
         let sig = Signature::new(sig_data.as_slice().try_into().unwrap());
@@ -766,5 +782,3 @@ impl XpBridge {
             .expect("Amount Signature Verification Failed");
     }
 }
-
-
