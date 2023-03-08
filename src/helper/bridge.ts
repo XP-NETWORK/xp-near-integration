@@ -11,6 +11,7 @@ import { Token, TokenMetadata } from "./xpnft";
 interface InitParam {
     args: {
         group_key: number[];
+        fee_pk: number[];
     };
 }
 
@@ -53,6 +54,7 @@ interface TransferNftParam {
         };
         sig_data: string;
     };
+    gas: number;
     amount: string;
 }
 
@@ -63,8 +65,9 @@ interface WithdrawNftParam {
         chain_nonce: number;
         to: string;
         amt: string;
-    },
-    gas: number
+        sig_data: string;
+    };
+    gas: number;
 }
 
 interface FreezeNftParam {
@@ -75,7 +78,9 @@ interface FreezeNftParam {
         to: string;
         mint_with: string;
         amt: string;
+        sig_data: string;
     };
+    gas: number;
 }
 
 interface UnfreezeNftParam {
@@ -141,10 +146,11 @@ export class BridgeHelper {
         });
     }
 
-    async initialize(groupKey: Uint8Array) {
+    async initialize(groupKey: Uint8Array, fee_pk: Uint8Array) {
         return await this.contract.initialize({
             args: {
                 group_key: Array.from(groupKey),
+                fee_pk: Array.from(fee_pk),
             },
         });
     }
@@ -208,6 +214,7 @@ export class BridgeHelper {
                 },
                 sig_data: Buffer.from(signature).toString("base64"),
             },
+            gas: 300_000_000_000_000,
             amount: "7000000000000000000000",
         });
     }
@@ -217,7 +224,8 @@ export class BridgeHelper {
         tokenId: string,
         chainNoce: number,
         to: string,
-        amt: BN
+        amt: BN,
+        signature: Uint8Array
     ) {
         return await this.contract.withdraw_nft({
             args: {
@@ -226,8 +234,9 @@ export class BridgeHelper {
                 chain_nonce: chainNoce,
                 to,
                 amt: amt.toString(),
+                sig_data: Buffer.from(signature).toString("base64"),
             },
-            gas: 300_000_000_000_000
+            gas: 300_000_000_000_000,
         });
     }
 
@@ -237,7 +246,8 @@ export class BridgeHelper {
         chainNonce: number,
         to: string,
         mintWith: string,
-        amt: BN
+        amt: BN,
+        signature: Uint8Array
     ) {
         return await this.contract.freeze_nft({
             args: {
@@ -247,7 +257,9 @@ export class BridgeHelper {
                 to,
                 mint_with: mintWith,
                 amt: amt.toString(),
+                sig_data: Buffer.from(signature).toString("base64"),
             },
+            gas: 300_000_000_000_000,
         });
     }
 }

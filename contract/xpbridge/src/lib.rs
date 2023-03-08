@@ -4,12 +4,13 @@ use near_contract_standards::non_fungible_token::Token;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
+use near_sdk::json_types::Base64VecU8;
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::PanicOnDefault;
 use near_sdk::ONE_NEAR;
 use near_sdk::{env, near_bindgen, require, AccountId, Gas, Promise, PromiseError};
-use sha2::{Digest, Sha512};
+use sha2::{Digest, Sha512, Sha256};
 pub mod events;
 pub mod external;
 pub use crate::events::*;
@@ -128,7 +129,7 @@ impl XpBridge {
 
         self.consumed_actions.insert(&action_id);
 
-        let mut hasher = Sha512::new();
+        let mut hasher = Sha256::new();
         hasher.update(context);
         hasher.update(data);
         let hash = hasher.finalize();
@@ -142,13 +143,13 @@ impl XpBridge {
     /// Pauses the contract which will stop all bridge actions from being executed.
     /// /// FAILS: If already paused.
     /// REQUIRED: Signature verification.
-    pub fn validate_pause(&mut self, data: PauseData, sig_data: Vec<u8>) {
+    pub fn validate_pause(&mut self, data: PauseData, sig_data: Base64VecU8) {
         require!(!self.paused, "paused");
 
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data,
+            sig_data.into(),
             b"SetPause",
         );
 
@@ -158,13 +159,13 @@ impl XpBridge {
     /// Unpauses the contract which will stop all bridge actions from being executed.
     /// FAILS: If already unpaused.
     /// REQUIRED: Signature verification.
-    pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Vec<u8>) {
+    pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Base64VecU8) {
         require!(self.paused, "unpaused");
 
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data,
+            sig_data.into(),
             b"SetUnpause",
         );
 
@@ -256,7 +257,7 @@ impl XpBridge {
     /// in the bridge
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification.
-    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
+    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Base64VecU8) {
         require!(!self.paused, "paused");
 
         require!(
@@ -267,7 +268,7 @@ impl XpBridge {
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data,
+            sig_data.into(),
             b"WhitelistNft",
         );
 
@@ -302,7 +303,7 @@ impl XpBridge {
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification.
     #[payable]
-    pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) -> Promise {
+    pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Base64VecU8) -> Promise {
         require!(
             env::prepaid_gas() >= GAS_FOR_VALIDATE_TRANSFER,
             "Not enough gas"
@@ -362,7 +363,7 @@ impl XpBridge {
         token_id: TokenId,
         chain_nonce: u8,
         to: String,
-        sig_data: Vec<u8>,
+        sig_data: Base64VecU8,
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_WITHDRAW_NFT, "Not enough gas");
         require!(!self.paused, "paused");
@@ -377,7 +378,7 @@ impl XpBridge {
                     token_contract: token_contract.clone(),
                     token_id: token_id.clone(),
                 },
-                sig_data,
+                sig_data.into(),
             )
             .then(
                 Self::ext(env::current_account_id())
@@ -520,7 +521,7 @@ impl XpBridge {
         chain_nonce: u8,
         to: String,
         mint_with: String,
-        sig_data: Vec<u8>,
+        sig_data: Base64VecU8,
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
@@ -535,7 +536,7 @@ impl XpBridge {
                     token_contract: token_contract.clone(),
                     token_id: token_id.clone(),
                 },
-                sig_data,
+                sig_data.into(),
             )
             .then(
                 Self::ext(env::current_account_id())

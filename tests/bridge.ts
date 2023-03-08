@@ -8,11 +8,13 @@ import { Account, connect, keyStores, Near } from "near-api-js";
 import { BridgeHelper, XpnftHelper } from "../src/helper";
 import BN from "bn.js";
 import {
+    FreezeNftData,
     PauseData,
     TokenMetadataData,
     TransferNftData,
     UnpauseData,
     WhitelistData,
+    WithdrawNftData,
 } from "../src/encode";
 
 describe("bridge", async () => {
@@ -28,6 +30,9 @@ describe("bridge", async () => {
 
     let pk: Uint8Array;
     let sk: Uint8Array;
+
+    let fee_pk: Uint8Array;
+    let fee_sk: Uint8Array;
 
     before(async () => {
         // Init the worker and start a Sandbox server
@@ -110,6 +115,9 @@ describe("bridge", async () => {
 
         sk = ed.utils.randomPrivateKey();
         pk = await ed.getPublicKey(sk);
+
+        fee_sk = ed.utils.randomPrivateKey();
+        fee_pk = await ed.getPublicKey(fee_sk);
     });
 
     it("initialize xpnft", async () => {
@@ -131,7 +139,7 @@ describe("bridge", async () => {
     it("initialize bridge", async () => {
         const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
 
-        await bridgeHelper.initialize(pk);
+        await bridgeHelper.initialize(pk, fee_pk);
 
         const storedPk = await bridgeHelper.getGroupKey();
         assert.ok(Buffer.from(pk).equals(Buffer.from(storedPk)));
@@ -146,7 +154,11 @@ describe("bridge", async () => {
             tokenContract: xpnftAcc.accountId,
         });
         const message = serialize(data);
-        const msgHash = createHash("SHA256").update(message).digest();
+        const context = Buffer.from("WhitelistNft");
+        const msgHash = createHash("SHA256")
+            .update(context)
+            .update(message)
+            .digest();
         const signature = await ed.sign(msgHash, sk);
         await bridgeHelper.whitelist(data, signature);
 
@@ -160,7 +172,11 @@ describe("bridge", async () => {
         const actionId = new BN(1);
         const data = new PauseData({ actionId });
         const message = serialize(data);
-        const msgHash = createHash("SHA256").update(message).digest();
+        const context = Buffer.from("SetPause");
+        const msgHash = createHash("SHA256")
+            .update(context)
+            .update(message)
+            .digest();
         const signature = await ed.sign(msgHash, sk);
         await bridgeHelper.pause(data, signature);
 
@@ -174,7 +190,11 @@ describe("bridge", async () => {
         const actionId = new BN(2);
         const data = new UnpauseData({ actionId });
         const message = serialize(data);
-        const msgHash = createHash("SHA256").update(message).digest();
+        const context = Buffer.from("SetUnpause");
+        const msgHash = createHash("SHA256")
+            .update(context)
+            .update(message)
+            .digest();
         const signature = await ed.sign(msgHash, sk);
         await bridgeHelper.unpause(data, signature);
 
@@ -207,7 +227,11 @@ describe("bridge", async () => {
             }),
         });
         const message = serialize(data);
-        const msgHash = createHash("SHA256").update(message).digest();
+        const context = Buffer.from("ValidateTransferNft");
+        const msgHash = createHash("SHA256")
+            .update(context)
+            .update(message)
+            .digest();
 
         const signature = await ed.sign(msgHash, sk);
         const res = await bridgeHelper.transferNft(data, signature);
@@ -219,12 +243,26 @@ describe("bridge", async () => {
         const chainNonce = 0;
         const to = "example_address";
         const amt = new BN(1_000_000_000_000);
+
+        const data = new WithdrawNftData({
+            tokenContract: xpnftAcc.accountId,
+            tokenId: "0",
+            chainNonce: 0,
+            to: to,
+            amt: amt,
+        });
+        const message = serialize(data);
+        const msgHash = createHash("SHA256").update(message).digest();
+
+        const signature = await ed.sign(msgHash, sk);
+
         await bridgeHelper.withdrawNft(
             xpnftAcc.accountId,
             "0",
             chainNonce,
             to,
-            amt
+            amt,
+            signature
         );
     });
 
@@ -268,7 +306,7 @@ describe("bridge", async () => {
             collectionOwnerAcc2.accountId,
             nftOwnerAcc2
         );
-        await nftHelper.approve("0", bridgeAcc.accountId)
+        await nftHelper.approve("0", bridgeAcc.accountId);
     });
 
     it("freeze nft:0", async () => {
@@ -280,13 +318,28 @@ describe("bridge", async () => {
             bridgeAcc.accountId,
             nftOwnerAcc2
         );
+
+        const data = new FreezeNftData({
+            tokenContract: xpnftAcc.accountId,
+            tokenId: "0",
+            chainNonce: chainNonce,
+            to: to,
+            mintWith: "foreign_nft_contract",
+            amt: amt,
+        });
+        const message = serialize(data);
+        const msgHash = createHash("SHA256").update(message).digest();
+
+        const signature = await ed.sign(msgHash, sk);
+
         await bridgeHelper.freezeNft(
             collectionOwnerAcc2.accountId,
             "0",
             chainNonce,
             to,
             "foreign_nft_contract",
-            amt
+            amt,
+            signature
         );
     });
 

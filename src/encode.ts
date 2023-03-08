@@ -4,7 +4,7 @@ import BN from "bn.js";
 export class WhitelistData {
     @field({ type: "u128" })
     actionId: BN;
-    @field({ type: "String" })
+    @field({ type: "string" })
     tokenContract: string;
 
     constructor(data: WhitelistData) {
@@ -88,6 +88,42 @@ export class TransferNftData {
     tokenMetadata: TokenMetadataData;
 
     constructor(data: TransferNftData) {
+        Object.assign(this, data);
+    }
+}
+
+export class WithdrawNftData {
+    @field({ type: "string" })
+    tokenContract: string;
+    @field({ type: "string" })
+    tokenId: string;
+    @field({ type: "u8" })
+    chainNonce: number;
+    @field({ type: "string" })
+    to: string;
+    @field({ type: "u128" })
+    amt: BN;
+
+    constructor(data: WithdrawNftData) {
+        Object.assign(this, data);
+    }
+}
+
+export class FreezeNftData {
+    @field({ type: "string" })
+    tokenContract: string;
+    @field({ type: "string" })
+    tokenId: string;
+    @field({ type: "u8" })
+    chainNonce: number;
+    @field({ type: "string" })
+    to: string;
+    @field({ type: "string" })
+    mintWith: string;
+    @field({ type: "u128" })
+    amt: BN;
+
+    constructor(data: FreezeNftData) {
         Object.assign(this, data);
     }
 }
