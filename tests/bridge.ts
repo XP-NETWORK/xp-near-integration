@@ -254,7 +254,7 @@ describe("bridge", async () => {
         const message = serialize(data);
         const msgHash = createHash("SHA256").update(message).digest();
 
-        const signature = await ed.sign(msgHash, sk);
+        const signature = await ed.sign(msgHash, fee_sk);
 
         await bridgeHelper.withdrawNft(
             xpnftAcc.accountId,
@@ -330,7 +330,7 @@ describe("bridge", async () => {
         const message = serialize(data);
         const msgHash = createHash("SHA256").update(message).digest();
 
-        const signature = await ed.sign(msgHash, sk);
+        const signature = await ed.sign(msgHash, fee_sk);
 
         await bridgeHelper.freezeNft(
             collectionOwnerAcc2.accountId,

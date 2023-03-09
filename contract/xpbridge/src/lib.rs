@@ -10,7 +10,7 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::PanicOnDefault;
 use near_sdk::ONE_NEAR;
 use near_sdk::{env, near_bindgen, require, AccountId, Gas, Promise, PromiseError};
-use sha2::{Digest, Sha512, Sha256};
+use sha2::{Digest, Sha256};
 pub mod events;
 pub mod external;
 pub use crate::events::*;
@@ -773,7 +773,7 @@ impl XpBridge {
 
     #[private]
     pub fn verify_paid_amount_by_sig(&self, data: TransferTx, sig_data: Vec<u8>) {
-        let mut hasher = Sha512::new();
+        let mut hasher = Sha256::new();
         hasher.update(data.try_to_vec().unwrap());
         let hash = hasher.finalize();
         let sig = Signature::new(sig_data.as_slice().try_into().unwrap());
