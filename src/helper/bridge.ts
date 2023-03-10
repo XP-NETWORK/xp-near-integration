@@ -21,7 +21,7 @@ interface WhitelistParam {
             action_id: string;
             token_contract: string;
         };
-        sig_data: string;
+        sig_data: number[];
     };
 }
 
@@ -30,7 +30,7 @@ interface PauseParam {
         data: {
             action_id: string;
         };
-        sig_data: string;
+        sig_data: number[];
     };
 }
 
@@ -39,7 +39,7 @@ interface UnpauseParam {
         data: {
             action_id: string;
         };
-        sig_data: string;
+        sig_data: number[];
     };
 }
 
@@ -52,7 +52,7 @@ interface TransferNftParam {
             owner_id: string;
             token_metadata: TokenMetadata;
         };
-        sig_data: string;
+        sig_data: number[];
     };
     gas: number;
     amount: string;
@@ -65,7 +65,7 @@ interface WithdrawNftParam {
         chain_nonce: number;
         to: string;
         amt: string;
-        sig_data: string;
+        sig_data: number[];
     };
     gas: number;
 }
@@ -78,9 +78,10 @@ interface FreezeNftParam {
         to: string;
         mint_with: string;
         amt: string;
-        sig_data: string;
+        sig_data: number[];
     };
     gas: number;
+    amount: BN;
 }
 
 interface UnfreezeNftParam {
@@ -162,7 +163,7 @@ export class BridgeHelper {
                     action_id: data.actionId.toString(),
                     token_contract: data.tokenContract,
                 },
-                sig_data: Buffer.from(signature).toString("base64"),
+                sig_data: [...signature],
             },
         });
     }
@@ -173,7 +174,7 @@ export class BridgeHelper {
                 data: {
                     action_id: data.actionId.toString(),
                 },
-                sig_data: Buffer.from(signature).toString("base64"),
+                sig_data: [...signature],
             },
         });
     }
@@ -184,7 +185,7 @@ export class BridgeHelper {
                 data: {
                     action_id: data.actionId.toString(),
                 },
-                sig_data: Buffer.from(signature).toString("base64"),
+                sig_data: [...signature],
             },
         });
     }
@@ -212,7 +213,7 @@ export class BridgeHelper {
                         reference_hash: data.tokenMetadata.referenceHash,
                     },
                 },
-                sig_data: Buffer.from(signature).toString("base64"),
+                sig_data: [...signature],
             },
             gas: 300_000_000_000_000,
             amount: "7000000000000000000000",
@@ -234,7 +235,7 @@ export class BridgeHelper {
                 chain_nonce: chainNoce,
                 to,
                 amt: amt.toString(),
-                sig_data: Buffer.from(signature).toString("base64"),
+                sig_data: [...signature],
             },
             gas: 300_000_000_000_000,
         });
@@ -257,9 +258,10 @@ export class BridgeHelper {
                 to,
                 mint_with: mintWith,
                 amt: amt.toString(),
-                sig_data: Buffer.from(signature).toString("base64"),
+                sig_data: [...signature],
             },
             gas: 300_000_000_000_000,
+            amount: new BN(1_000_000_000_000),
         });
     }
 }

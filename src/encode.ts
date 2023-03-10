@@ -127,3 +127,18 @@ export class FreezeNftData {
         Object.assign(this, data);
     }
 }
+
+export class TransferTxData {
+    @field({ type: 'u128' })
+    value: BN | undefined;
+    @field({ type: 'u8' })
+    fromChain: number | undefined;
+    @field({ type: 'u8' })
+    toChain: number | undefined;
+    @field({ type: 'string' })
+    to: string | undefined;
+
+    constructor(data: TransferTxData) {
+        Object.assign(this, data);
+    }
+}

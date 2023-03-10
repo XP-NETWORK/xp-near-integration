@@ -4,13 +4,12 @@ use near_contract_standards::non_fungible_token::Token;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
-use near_sdk::json_types::Base64VecU8;
 use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::PanicOnDefault;
 use near_sdk::ONE_NEAR;
 use near_sdk::{env, near_bindgen, require, AccountId, Gas, Promise, PromiseError};
-use sha2::{Digest, Sha256};
+use sha2::{Digest, Sha512};
 pub mod events;
 pub mod external;
 pub use crate::events::*;
@@ -61,8 +60,6 @@ pub struct TransferTx {
     value: u128,
     from_chain: u8,
     to_chain: u8,
-    token_contract: AccountId,
-    token_id: TokenId,
     to: String,
 }
 
@@ -129,7 +126,7 @@ impl XpBridge {
 
         self.consumed_actions.insert(&action_id);
 
-        let mut hasher = Sha256::new();
+        let mut hasher = Sha512::new();
         hasher.update(context);
         hasher.update(data);
         let hash = hasher.finalize();
@@ -143,13 +140,13 @@ impl XpBridge {
     /// Pauses the contract which will stop all bridge actions from being executed.
     /// /// FAILS: If already paused.
     /// REQUIRED: Signature verification.
-    pub fn validate_pause(&mut self, data: PauseData, sig_data: Base64VecU8) {
+    pub fn validate_pause(&mut self, data: PauseData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data.into(),
+            sig_data,
             b"SetPause",
         );
 
@@ -159,13 +156,13 @@ impl XpBridge {
     /// Unpauses the contract which will stop all bridge actions from being executed.
     /// FAILS: If already unpaused.
     /// REQUIRED: Signature verification.
-    pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Base64VecU8) {
+    pub fn validate_unpause(&mut self, data: UnpauseData, sig_data: Vec<u8>) {
         require!(self.paused, "unpaused");
 
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data.into(),
+            sig_data,
             b"SetUnpause",
         );
 
@@ -257,7 +254,7 @@ impl XpBridge {
     /// in the bridge
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification.
-    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Base64VecU8) {
+    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
         require!(
@@ -268,7 +265,7 @@ impl XpBridge {
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data.into(),
+            sig_data,
             b"WhitelistNft",
         );
 
@@ -303,7 +300,7 @@ impl XpBridge {
     /// FAILS: If contract is paused.
     /// REQUIRED: Signature verification.
     #[payable]
-    pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Base64VecU8) -> Promise {
+    pub fn validate_transfer_nft(&mut self, data: TransferNftData, sig_data: Vec<u8>) -> Promise {
         require!(
             env::prepaid_gas() >= GAS_FOR_VALIDATE_TRANSFER,
             "Not enough gas"
@@ -313,7 +310,7 @@ impl XpBridge {
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
-            sig_data.into(),
+            sig_data,
             b"ValidateTransferNft",
         );
 
@@ -363,7 +360,7 @@ impl XpBridge {
         token_id: TokenId,
         chain_nonce: u8,
         to: String,
-        sig_data: Base64VecU8,
+        sig_data: Vec<u8>,
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_WITHDRAW_NFT, "Not enough gas");
         require!(!self.paused, "paused");
@@ -375,10 +372,8 @@ impl XpBridge {
                     from_chain: 31,
                     to_chain: chain_nonce,
                     to: to.clone(),
-                    token_contract: token_contract.clone(),
-                    token_id: token_id.clone(),
                 },
-                sig_data.into(),
+                sig_data,
             )
             .then(
                 Self::ext(env::current_account_id())
@@ -521,7 +516,7 @@ impl XpBridge {
         chain_nonce: u8,
         to: String,
         mint_with: String,
-        sig_data: Base64VecU8,
+        sig_data: Vec<u8>,
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
@@ -533,10 +528,8 @@ impl XpBridge {
                     from_chain: 31,
                     to_chain: chain_nonce,
                     to: to.clone(),
-                    token_contract: token_contract.clone(),
-                    token_id: token_id.clone(),
                 },
-                sig_data.into(),
+                sig_data,
             )
             .then(
                 Self::ext(env::current_account_id())
@@ -773,7 +766,7 @@ impl XpBridge {
 
     #[private]
     pub fn verify_paid_amount_by_sig(&self, data: TransferTx, sig_data: Vec<u8>) {
-        let mut hasher = Sha256::new();
+        let mut hasher = Sha512::new();
         hasher.update(data.try_to_vec().unwrap());
         let hash = hasher.finalize();
         let sig = Signature::new(sig_data.as_slice().try_into().unwrap());

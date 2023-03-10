@@ -12,6 +12,7 @@ import {
     PauseData,
     TokenMetadataData,
     TransferNftData,
+    TransferTxData,
     UnpauseData,
     WhitelistData,
     WithdrawNftData,
@@ -155,7 +156,7 @@ describe("bridge", async () => {
         });
         const message = serialize(data);
         const context = Buffer.from("WhitelistNft");
-        const msgHash = createHash("SHA256")
+        const msgHash = createHash("SHA512")
             .update(context)
             .update(message)
             .digest();
@@ -173,7 +174,7 @@ describe("bridge", async () => {
         const data = new PauseData({ actionId });
         const message = serialize(data);
         const context = Buffer.from("SetPause");
-        const msgHash = createHash("SHA256")
+        const msgHash = createHash("SHA512")
             .update(context)
             .update(message)
             .digest();
@@ -191,7 +192,7 @@ describe("bridge", async () => {
         const data = new UnpauseData({ actionId });
         const message = serialize(data);
         const context = Buffer.from("SetUnpause");
-        const msgHash = createHash("SHA256")
+        const msgHash = createHash("SHA512")
             .update(context)
             .update(message)
             .digest();
@@ -228,7 +229,7 @@ describe("bridge", async () => {
         });
         const message = serialize(data);
         const context = Buffer.from("ValidateTransferNft");
-        const msgHash = createHash("SHA256")
+        const msgHash = createHash("SHA512")
             .update(context)
             .update(message)
             .digest();
@@ -244,15 +245,14 @@ describe("bridge", async () => {
         const to = "example_address";
         const amt = new BN(1_000_000_000_000);
 
-        const data = new WithdrawNftData({
-            tokenContract: xpnftAcc.accountId,
-            tokenId: "0",
-            chainNonce: 0,
+        const data = new TransferTxData({
+            value: amt,
+            fromChain: 31,
+            toChain: chainNonce,
             to: to,
-            amt: amt,
         });
         const message = serialize(data);
-        const msgHash = createHash("SHA256").update(message).digest();
+        const msgHash = createHash("SHA512").update(message).digest();
 
         const signature = await ed.sign(msgHash, fee_sk);
 
@@ -319,16 +319,14 @@ describe("bridge", async () => {
             nftOwnerAcc2
         );
 
-        const data = new FreezeNftData({
-            tokenContract: xpnftAcc.accountId,
-            tokenId: "0",
-            chainNonce: chainNonce,
+        const data = new TransferTxData({
+            value: amt,
+            fromChain: 31,
+            toChain: chainNonce,
             to: to,
-            mintWith: "foreign_nft_contract",
-            amt: amt,
         });
         const message = serialize(data);
-        const msgHash = createHash("SHA256").update(message).digest();
+        const msgHash = createHash("SHA512").update(message).digest();
 
         const signature = await ed.sign(msgHash, fee_sk);
 
