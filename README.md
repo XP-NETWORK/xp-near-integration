@@ -91,7 +91,7 @@ Deploying xpnft and bridge contract
 
 ```
 near deploy --wasmFile target/wasm32-unknown-unknown/release/xpnft.wasm --accountId YOUR_ACCOUNT_HERE
-near deploy --wasmFile target/wasm32-unknown-unknown/release/bridge.wasm --accountId YOUR_ACCOUNT_HERE
+near deploy --wasmFile target/wasm32-unknown-unknown/release/xpbridge.wasm --accountId YOUR_ACCOUNT_HERE
 ```
 
 Switching chains (The default network for near-cli is testnet):

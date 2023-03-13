@@ -633,6 +633,7 @@ impl XpBridge {
     /// This function unfreezes the NFT on the bridge contract.
     /// It will transfer the NFT from this contract to the receiver
     /// contract.
+    #[payable]
     pub fn validate_unfreeze_nft(&mut self, data: UnfreezeNftData, sig_data: Vec<u8>) -> Promise {
         require!(
             env::prepaid_gas() >= GAS_FOR_VALIDATE_UNFREEZE,
@@ -654,6 +655,7 @@ impl XpBridge {
         );
 
         common_nft::ext(data.token_contract)
+            .with_attached_deposit(env::attached_deposit())
             .with_static_gas(Gas(TGAS * 10))
             .nft_transfer(data.receiver_id, data.token_id, None, None)
             .then(
@@ -737,6 +739,14 @@ impl XpBridge {
             action_id,
             token_id,
             receiver_id,
+            token_contract,
+        };
+        event.try_to_vec().unwrap()
+    }
+
+    pub fn encode_whitelist_action(&self, action_id: U128, token_contract: String) -> Vec<u8> {
+        let event = WhitelistData {
+            action_id,
             token_contract,
         };
         event.try_to_vec().unwrap()
