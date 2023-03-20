@@ -701,6 +701,7 @@ impl XpBridge {
         description: String,
         media: String,
         extra: String,
+        reference: String,
     ) -> Vec<u8> {
         let data = TransferNftData {
             action_id,
@@ -718,7 +719,7 @@ impl XpBridge {
                 starts_at: None,
                 updated_at: None,
                 extra: Some(extra),
-                reference: None,
+                reference: Some(reference),
                 reference_hash: None,
             },
         };
