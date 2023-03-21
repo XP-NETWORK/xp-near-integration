@@ -3,7 +3,7 @@ use crate::*;
 #[near_bindgen]
 impl Contract {
     #[payable]
-    pub fn nft_burn(&mut self, token_id: TokenId, from: AccountId) {
+    pub fn nft_burn(&mut self, token_id: TokenId, from: AccountId) -> Promise {
         assert_eq!(env::predecessor_account_id(), self.owner_id, "Unauthorized");
 
         let owner = self.owner_by_id.get(&token_id).expect("unknown token id");
@@ -12,7 +12,7 @@ impl Contract {
             env::panic_str("owner is not who we expected it was")
         }
 
-        let storage_used = env::storage_usage();
+        let initial_storage_usage = env::storage_usage();
 
         // A lot of moving parts here.. code reviewers.. did I get it
         // all?  Hard to believe nobody has implemented burn in the
@@ -65,9 +65,12 @@ impl Contract {
         env::log_str(&nft_burn_log.to_string());
 
         //calculate the required storage which was the used - initial
-        let required_storage_in_bytes = env::storage_usage() - storage_used;
+        let required_storage_in_bytes = env::storage_usage() - initial_storage_usage;
 
         //refund any excess storage if the user attached too much. Panic if they didn't attach enough to cover the required.
         refund_deposit(required_storage_in_bytes);
+
+        Promise::new(env::predecessor_account_id())
+            .transfer(required_storage_in_bytes as u128 * env::storage_byte_cost())
     }
 }

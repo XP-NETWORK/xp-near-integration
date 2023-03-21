@@ -1,6 +1,6 @@
 use ed25519_compact::{PublicKey, Signature};
 use near_contract_standards::non_fungible_token::metadata::TokenMetadata;
-use near_contract_standards::non_fungible_token::Token;
+// use near_contract_standards::non_fungible_token::Token;
 use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
@@ -14,6 +14,7 @@ pub mod events;
 pub mod external;
 pub use crate::events::*;
 pub use crate::external::*;
+use std::collections::HashMap;
 
 const GAS_FOR_FREEZE_NFT: Gas = Gas(45_000_000_000_000);
 const GAS_FOR_WITHDRAW_NFT: Gas = Gas(65_000_000_000_000);
@@ -71,6 +72,7 @@ pub struct TransferNftData {
     token_id: TokenId,
     owner_id: AccountId,
     token_metadata: TokenMetadata,
+    perpetual_royalties: Option<HashMap<AccountId, u32>>,
 }
 
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -314,10 +316,15 @@ impl XpBridge {
             b"ValidateTransferNft",
         );
 
-        xpnft::ext(data.mint_with)
+        xpnft_royalty::ext(data.mint_with)
             .with_attached_deposit(env::attached_deposit())
             .with_static_gas(Gas(TGAS * 10))
-            .nft_mint(data.token_id, data.owner_id, data.token_metadata)
+            .nft_mint(
+                data.token_id,
+                data.owner_id,
+                data.token_metadata,
+                data.perpetual_royalties,
+            )
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(Gas(TGAS * 10))
@@ -402,7 +409,7 @@ impl XpBridge {
     ) {
         match call_result {
             Ok(_) => {
-                xpnft::ext(token_contract.clone())
+                xpnft_royalty::ext(token_contract.clone())
                     .with_static_gas(Gas(5 * TGAS))
                     .nft_token(token_id.clone())
                     .then(
@@ -444,7 +451,7 @@ impl XpBridge {
         #[callback_result] call_result: Result<Option<Token>, PromiseError>,
     ) -> Promise {
         match call_result {
-            Ok(_) => xpnft::ext(token_contract.clone())
+            Ok(_) => xpnft_royalty::ext(token_contract.clone())
                 .with_static_gas(Gas(TGAS * 10))
                 .nft_burn(token_id.clone(), owner_id)
                 .then(
@@ -702,6 +709,7 @@ impl XpBridge {
         media: String,
         extra: String,
         reference: String,
+        perpetual_royalties: Option<HashMap<AccountId, u32>>,
     ) -> Vec<u8> {
         let data = TransferNftData {
             action_id,
@@ -722,6 +730,7 @@ impl XpBridge {
                 reference: Some(reference),
                 reference_hash: None,
             },
+            perpetual_royalties,
         };
         data.try_to_vec().unwrap()
     }

@@ -6,11 +6,11 @@ impl Contract {
     pub fn nft_mint(
         &mut self,
         token_id: TokenId,
-        metadata: TokenMetadata,
-        receiver_id: AccountId,
+        token_metadata: TokenMetadata,
+        token_owner_id: AccountId,
         //we add an optional parameter for perpetual royalties
         perpetual_royalties: Option<HashMap<AccountId, u32>>,
-    ) {
+    ) -> Token {
         assert_eq!(env::predecessor_account_id(), self.owner_id, "Unauthorized");
         //measure the initial storage being used on the contract
         let initial_storage_usage = env::storage_usage();
@@ -32,11 +32,11 @@ impl Contract {
             }
         }
 
-        let cloned_owner = receiver_id.clone();
+        let cloned_owner = token_owner_id.clone();
         //specify the token struct that contains the owner ID
         let token = Token {
             //set the owner ID equal to the receiver ID passed into the function
-            owner_id: receiver_id,
+            owner_id: token_owner_id,
             //we set the approved account IDs to the default value (an empty map)
             approved_account_ids: Default::default(),
             //the next approval ID is set to 0
@@ -52,7 +52,7 @@ impl Contract {
         );
 
         //insert the token ID and metadata
-        self.token_metadata_by_id.insert(&token_id, &metadata);
+        self.token_metadata_by_id.insert(&token_id, &token_metadata);
 
         self.owner_by_id.insert(&token_id, &cloned_owner);
 
@@ -84,5 +84,7 @@ impl Contract {
 
         //refund any excess storage if the user attached too much. Panic if they didn't attach enough to cover the required.
         refund_deposit(required_storage_in_bytes);
+
+        token
     }
 }

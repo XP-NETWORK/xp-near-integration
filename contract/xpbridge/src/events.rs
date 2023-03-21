@@ -1,10 +1,24 @@
-use near_contract_standards::non_fungible_token::{Token, TokenId};
+use std::collections::HashMap;
+
+use near_contract_standards::non_fungible_token::TokenId;
 use near_sdk::{
     env,
     serde::{Deserialize, Serialize},
     serde_json::{self},
     AccountId,
 };
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Token {
+    //owner of the token
+    pub owner_id: AccountId,
+    //list of approved account IDs that have access to transfer the token. This maps an account ID to an approval ID
+    pub approved_account_ids: HashMap<AccountId, u64>,
+    //the next approval ID to give out.
+    pub next_approval_id: u64,
+    //keep track of the royalty percentages for the token in a hash map
+    pub royalty: HashMap<AccountId, u32>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
@@ -20,7 +34,10 @@ pub struct TransferNftEvent {
 
 impl TransferNftEvent {
     fn to_json_string(&self) -> String {
-        let event = Event{event: self, event_type: "TransferUnique"};
+        let event = Event {
+            event: self,
+            event_type: "TransferUnique",
+        };
         // Events cannot fail to serialize so fine to panic on error
         serde_json::to_string(&event)
             .ok()
@@ -28,10 +45,7 @@ impl TransferNftEvent {
     }
 
     fn to_json_event_string(&self) -> String {
-        format!(
-            "EVENT_JSON:{}",
-            self.to_json_string()
-        )
+        format!("EVENT_JSON:{}", self.to_json_string())
     }
 
     pub fn emit(self) {
@@ -52,14 +66,17 @@ pub struct UnfreezeNftEvent {
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
-pub struct Event< 's, T> {
-    pub event_type: &'s str ,
+pub struct Event<'s, T> {
+    pub event_type: &'s str,
     pub event: T,
 }
 
 impl UnfreezeNftEvent {
     fn to_json_string(&self) -> String {
-        let event = Event{event: self, event_type: "UnfreezeUnique"};
+        let event = Event {
+            event: self,
+            event_type: "UnfreezeUnique",
+        };
         // Events cannot fail to serialize so fine to panic on error
         serde_json::to_string(&event)
             .ok()
@@ -67,10 +84,7 @@ impl UnfreezeNftEvent {
     }
 
     fn to_json_event_string(&self) -> String {
-        format!(
-            "EVENT_JSON:{}",
-            self.to_json_string()
-        )
+        format!("EVENT_JSON:{}", self.to_json_string())
     }
 
     pub fn emit(self) {
