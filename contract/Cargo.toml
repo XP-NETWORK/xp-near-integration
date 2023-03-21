@@ -10,5 +10,6 @@ overflow-checks = true
 members = [
     "xpnft",
     "xpbridge",
-    "currency-data-oracle"
+    "currency-data-oracle",
+    "xpnft-royalty"
 ]
