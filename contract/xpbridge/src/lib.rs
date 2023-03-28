@@ -75,6 +75,16 @@ pub struct TransferNftData {
     perpetual_royalties: Option<HashMap<AccountId, u32>>,
 }
 
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct TransferMtData {
+    action_id: U128,
+    mint_with: AccountId,
+    owner_id: AccountId,
+    token_metadatas: Vec<TokenMetadata>,
+    supply: Vec<u128>,
+}
+
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct UnfreezeNftData {
@@ -82,6 +92,16 @@ pub struct UnfreezeNftData {
     token_contract: AccountId,
     token_id: TokenId,
     receiver_id: AccountId,
+    token_amt: U128,
+}
+#[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct UnfreezeMtData {
+    action_id: u128,
+    token_contract: AccountId,
+    token_ids: Vec<TokenId>,
+    receiver_id: AccountId,
+    token_amts: Vec<u128>,
 }
 
 #[near_bindgen]
@@ -524,9 +544,14 @@ impl XpBridge {
         to: String,
         mint_with: String,
         sig_data: Vec<u8>,
+        token_amt: Option<u128>,
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
+        require!(
+            self.whitelist.contains(&token_contract.clone().to_string()),
+            "Not whitelist"
+        );
 
         return Self::ext(env::current_account_id())
             .verify_paid_amount_by_sig(
@@ -549,6 +574,7 @@ impl XpBridge {
                         mint_with,
                         env::attached_deposit(),
                         env::signer_account_id(),
+                        token_amt,
                     ),
             );
     }
@@ -563,34 +589,71 @@ impl XpBridge {
         mint_with: String,
         amt: u128,
         sender: AccountId,
+        token_amt: Option<u128>,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         match call_result {
             Ok(_) => {
-                common_nft::ext(token_contract.clone())
-                    .with_attached_deposit(1)
-                    .with_static_gas(Gas(TGAS * 10))
-                    .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
-                    .then(
-                        Self::ext(env::current_account_id())
-                            .with_static_gas(Gas(TGAS * 8))
-                            .freeze_callback(
-                                token_contract,
-                                token_id,
-                                chain_nonce,
-                                to,
-                                mint_with,
-                                amt,
-                                sender,
-                            ),
-                    );
+                if token_amt > Some(0) {
+                    common_mt::ext(token_contract.clone())
+                        .with_attached_deposit(1)
+                        .with_static_gas(Gas(TGAS * 10))
+                        .mt_transfer(
+                            env::current_account_id(),
+                            token_id.clone(),
+                            match token_amt {
+                                Some(p) => p,
+                                None => 0,
+                            },
+                            None,
+                            None,
+                        )
+                        .then(
+                            Self::ext(env::current_account_id())
+                                .with_static_gas(Gas(TGAS * 8))
+                                .freeze_callback(
+                                    token_contract,
+                                    token_id,
+                                    chain_nonce,
+                                    to,
+                                    mint_with,
+                                    amt,
+                                    sender,
+                                    token_amt,
+                                ),
+                        );
+                } else {
+                    common_nft::ext(token_contract.clone())
+                        .with_attached_deposit(1)
+                        .with_static_gas(Gas(TGAS * 10))
+                        .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
+                        .then(
+                            Self::ext(env::current_account_id())
+                                .with_static_gas(Gas(TGAS * 8))
+                                .freeze_callback(
+                                    token_contract,
+                                    token_id,
+                                    chain_nonce,
+                                    to,
+                                    mint_with,
+                                    amt,
+                                    sender,
+                                    token_amt,
+                                ),
+                        );
+                }
             }
             Err(e) => {
                 Promise::new(sender).transfer(amt);
-                env::log_str(&format!(
-                    "freeze callback: failed to transfer nft: failed to verify tx fee :actionid: {} : {:?}",
-                    self.action_cnt, e
-                ))
+                let msg;
+                if token_amt > Some(0) {
+                    msg = format!("freeze callback: failed to transfer mt: failed to verify tx fee :actionid: {} : {:?}",
+                    self.action_cnt, e);
+                } else {
+                    msg = format!("freeze callback: failed to transfer nft: failed to verify tx fee :actionid: {} : {:?}",
+                    self.action_cnt, e)
+                }
+                env::log_str(&msg)
             }
         }
     }
@@ -609,6 +672,7 @@ impl XpBridge {
         mint_with: String,
         amt: u128,
         sender: AccountId,
+        token_amt: Option<u128>,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         match call_result {
@@ -624,15 +688,25 @@ impl XpBridge {
                     contract: token_contract,
                     token_id,
                     mint_with,
+                    token_amt,
                 }
                 .emit();
             }
             Err(e) => {
                 Promise::new(sender).transfer(amt);
-                env::log_str(&format!(
-                    "freeze callback: failed to transfer nft: actionid: {} : {:?}",
-                    self.action_cnt, e
-                ))
+                let msg;
+                if token_amt > Some(0) {
+                    msg = format!(
+                        "freeze callback: failed to transfer mt: actionid: {} : {:?}",
+                        self.action_cnt, e
+                    );
+                } else {
+                    msg = format!(
+                        "freeze callback: failed to transfer nft: actionid: {} : {:?}",
+                        self.action_cnt, e
+                    )
+                }
+                env::log_str(&msg);
             }
         }
     }
@@ -661,15 +735,33 @@ impl XpBridge {
             b"ValidateUnfreezeNft",
         );
 
-        common_nft::ext(data.token_contract)
-            .with_attached_deposit(env::attached_deposit())
-            .with_static_gas(Gas(TGAS * 10))
-            .nft_transfer(data.receiver_id, data.token_id, None, None)
-            .then(
-                Self::ext(env::current_account_id())
-                    .with_static_gas(Gas(TGAS * 10))
-                    .validate_unfreeze_callback(data.action_id.0),
-            )
+        if data.token_amt > U128(0) {
+            common_mt::ext(data.token_contract)
+                .with_attached_deposit(env::attached_deposit())
+                .with_static_gas(Gas(TGAS * 10))
+                .mt_transfer(
+                    data.receiver_id,
+                    data.token_id,
+                    data.token_amt.into(),
+                    None,
+                    None,
+                )
+                .then(
+                    Self::ext(env::current_account_id())
+                        .with_static_gas(Gas(TGAS * 10))
+                        .validate_unfreeze_callback(data.action_id.0, data.token_amt.0),
+                )
+        } else {
+            common_nft::ext(data.token_contract)
+                .with_attached_deposit(env::attached_deposit())
+                .with_static_gas(Gas(TGAS * 10))
+                .nft_transfer(data.receiver_id, data.token_id, None, None)
+                .then(
+                    Self::ext(env::current_account_id())
+                        .with_static_gas(Gas(TGAS * 10))
+                        .validate_unfreeze_callback(data.action_id.0, data.token_amt.0),
+                )
+        }
     }
 
     /// This is the callback function when the promise in the validate_unfreeze_nft
@@ -679,6 +771,7 @@ impl XpBridge {
     pub fn validate_unfreeze_callback(
         &mut self,
         action_id: u128,
+        token_amt: u128,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         let _res = match call_result {
@@ -687,10 +780,19 @@ impl XpBridge {
             }
             Err(e) => {
                 self.consumed_actions.remove(&action_id);
-                env::log_str(&format!(
-                    "validate unfreeze callback: failed to transfer nft: action id: {}: {:?}",
-                    action_id, e
-                ))
+                let msg;
+                if token_amt > U128(0).into() {
+                    msg = format!(
+                        "validate unfreeze callback: failed to transfer mt: action id: {}: {:?}",
+                        action_id, e
+                    );
+                } else {
+                    msg = format!(
+                        "validate unfreeze callback: failed to transfer nft: action id: {}: {:?}",
+                        action_id, e
+                    )
+                }
+                env::log_str(&msg);
             }
         };
     }
@@ -744,12 +846,14 @@ impl XpBridge {
         token_id: String,
         receiver_id: AccountId,
         token_contract: AccountId,
+        token_amt: U128,
     ) -> Vec<u8> {
         let event = UnfreezeNftData {
             action_id,
             token_id,
             receiver_id,
             token_contract,
+            token_amt,
         };
         event.try_to_vec().unwrap()
     }
@@ -758,6 +862,48 @@ impl XpBridge {
         let event = WhitelistData {
             action_id,
             token_contract,
+        };
+        event.try_to_vec().unwrap()
+    }
+
+    /// This function takes all the parameters of the TransferNftData
+    /// and then encodes into Bytes (Vec<u8>) which is consumed by the
+    /// validator for signing the transaction.
+    pub fn encode_transfer_action_mt(
+        &self,
+        action_id: U128,
+        mint_with: AccountId,
+        owner_id: AccountId,
+        token_metadatas: Vec<TokenMetadata>,
+        supply: Vec<u128>,
+    ) -> Vec<u8> {
+        let data = TransferMtData {
+            action_id,
+            mint_with,
+            owner_id,
+            token_metadatas,
+            supply,
+        };
+        data.try_to_vec().unwrap()
+    }
+
+    /// This function takes all the parameters of the UnfreezeNftData
+    /// and then encodes into Bytes (Vec<u8>) which is consumed by the
+    /// validator for signing the transaction.
+    pub fn encode_unfreeze_action_mt(
+        &self,
+        action_id: U128,
+        token_ids: Vec<TokenId>,
+        receiver_id: AccountId,
+        token_contract: AccountId,
+        token_amts: Vec<u128>,
+    ) -> Vec<u8> {
+        let event = UnfreezeMtData {
+            action_id: action_id.into(),
+            token_contract,
+            token_ids,
+            receiver_id,
+            token_amts: token_amts.into(),
         };
         event.try_to_vec().unwrap()
     }
@@ -782,6 +928,317 @@ impl XpBridge {
     /// Gets the no of actions performed by the contract.
     pub fn get_action_cnt(&self) -> U128 {
         U128(self.action_cnt)
+    }
+
+    #[payable]
+    pub fn freeze_mt(
+        &mut self,
+        token_contract: AccountId,
+        token_id: TokenId,
+        chain_nonce: u8,
+        to: String,
+        mint_with: String,
+        sig_data: Vec<u8>,
+    ) -> Promise {
+        require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
+        require!(!self.paused, "paused");
+        require!(
+            self.whitelist.contains(&token_contract.clone().to_string()),
+            "Not whitelist"
+        );
+
+        return Self::ext(env::current_account_id())
+            .verify_paid_amount_by_sig(
+                TransferTx {
+                    value: env::attached_deposit().into(),
+                    from_chain: 31,
+                    to_chain: chain_nonce,
+                    to: to.clone(),
+                },
+                sig_data,
+            )
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 30))
+                    .check_enough_fees_callback_for_transfer(
+                        token_contract,
+                        token_id,
+                        chain_nonce,
+                        to,
+                        mint_with,
+                        env::attached_deposit(),
+                        env::signer_account_id(),
+                        Some(1),
+                    ),
+            );
+    }
+
+    #[payable]
+    pub fn withdraw_mt(
+        &mut self,
+        token_contract: AccountId,
+        token_ids: Vec<TokenId>,
+        chain_nonce: u8,
+        to: String,
+        sig_data: Vec<u8>,
+        token_amts: Vec<u128>,
+    ) -> Promise {
+        require!(env::prepaid_gas() >= GAS_FOR_WITHDRAW_NFT, "Not enough gas");
+        require!(!self.paused, "paused");
+
+        return Self::ext(env::current_account_id())
+            .verify_paid_amount_by_sig(
+                TransferTx {
+                    value: env::attached_deposit().into(),
+                    from_chain: 31,
+                    to_chain: chain_nonce,
+                    to: to.clone(),
+                },
+                sig_data,
+            )
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 45))
+                    .check_enough_fees_callback_for_withdraw_mt(
+                        token_contract,
+                        token_ids,
+                        chain_nonce,
+                        to,
+                        env::attached_deposit(),
+                        env::signer_account_id(),
+                        token_amts,
+                    ),
+            );
+    }
+
+    #[private]
+    pub fn check_enough_fees_callback_for_withdraw_mt(
+        &self,
+        token_contract: AccountId,
+        token_ids: Vec<TokenId>,
+        chain_nonce: u8,
+        to: String,
+        amt: u128,
+        sender: AccountId,
+        token_amts: Vec<u128>,
+        #[callback_result] call_result: Result<(), PromiseError>,
+    ) {
+        match call_result {
+            Ok(_) => {
+                xpnft_erc1155::ext(token_contract.clone())
+                    .with_static_gas(Gas(5 * TGAS))
+                    .mt_token(token_ids.clone())
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(Gas(TGAS * 25))
+                            .multitoken_callback(
+                                token_contract,
+                                token_ids,
+                                sender,
+                                chain_nonce,
+                                to,
+                                env::attached_deposit(),
+                                token_amts,
+                            ),
+                    );
+            }
+            Err(e) => {
+                Promise::new(sender).transfer(amt);
+                env::log_str(&format!(
+                    "withdraw callback: failed to transfer mt: failed to get tx fee :actionid: {} : {:?}",
+                    self.action_cnt, e
+                ))
+            }
+        }
+    }
+
+    #[private]
+    pub fn multitoken_callback(
+        &mut self,
+        token_contract: AccountId,
+        token_ids: Vec<TokenId>,
+        owner_id: AccountId,
+        chain_nonce: u8,
+        to: String,
+        amt: u128,
+        token_amts: Vec<u128>,
+        #[callback_result] call_result: Result<Option<MultiToken>, PromiseError>,
+    ) -> Promise {
+        match call_result {
+            Ok(_) => xpnft_erc1155::ext(token_contract.clone())
+                .with_static_gas(Gas(TGAS * 10))
+                .mt_burn(token_ids.clone(), token_amts.clone(), owner_id)
+                .then(
+                    Self::ext(env::current_account_id())
+                        .with_static_gas(Gas(TGAS * 8))
+                        .withdraw_callback_mt(
+                            token_contract,
+                            call_result.unwrap(),
+                            chain_nonce,
+                            to,
+                            amt.into(),
+                            env::predecessor_account_id(),
+                            token_amts,
+                        ),
+                ),
+            Err(_) => {
+                // Return funds
+                Promise::new(env::signer_account_id()).transfer(amt)
+            }
+        }
+    }
+
+    #[private]
+    pub fn withdraw_callback_mt(
+        &mut self,
+        token_contract: AccountId,
+        tokens: Option<MultiToken>,
+        chain_nonce: u8,
+        to: String,
+        amt: u128,
+        sender: AccountId,
+        token_amts: Vec<u128>,
+        #[callback_result] call_result: Result<(), PromiseError>,
+    ) {
+        match call_result {
+            Ok(_) => {
+                self.action_cnt += 1;
+                self.tx_fees += amt;
+
+                UnfreezeMtEvent {
+                    action_id: self.action_cnt,
+                    chain_nonce,
+                    to,
+                    amt,
+                    contract: token_contract,
+                    tokens,
+                    token_amts,
+                }
+                .emit();
+            }
+            Err(e) => {
+                Promise::new(sender).transfer(amt);
+                env::log_str(&format!(
+                    "validate withdraw callback: failed to burn mt:  actionid: {} : {:?}",
+                    self.action_cnt, e
+                ))
+            }
+        }
+    }
+
+    #[payable]
+    pub fn validate_unfreeze_mt_batch(
+        &mut self,
+        data: UnfreezeMtData,
+        sig_data: Vec<u8>,
+    ) -> Promise {
+        require!(
+            env::prepaid_gas() >= GAS_FOR_VALIDATE_UNFREEZE,
+            "Not enough gas"
+        );
+        require!(!self.paused, "paused");
+
+        require!(
+            self.whitelist
+                .contains(&data.token_contract.clone().to_string()),
+            "Not whitelist"
+        );
+
+        self.require_sig(
+            data.action_id.into(),
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"ValidateUnfreezeMtBatch",
+        );
+
+        common_mt::ext(data.token_contract)
+            .with_attached_deposit(env::attached_deposit())
+            .with_static_gas(Gas(TGAS * 10))
+            .mt_batch_transfer(
+                data.receiver_id,
+                data.token_ids,
+                data.token_amts,
+                None,
+                None,
+            )
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 10))
+                    .validate_unfreeze_callback_batch(data.action_id),
+            )
+    }
+
+    /// This is the callback function when the promise in the validate_unfreeze_nft
+    /// function is completed. It will check if the promise result was
+    /// successful or not.
+    #[private]
+    pub fn validate_unfreeze_callback_batch(
+        &mut self,
+        action_id: u128,
+        #[callback_result] call_result: Result<(), PromiseError>,
+    ) {
+        let _res = match call_result {
+            Ok(_) => {
+                // Do Nothing
+            }
+            Err(e) => {
+                self.consumed_actions.remove(&action_id);
+                let msg = format!(
+                    "validate unfreeze callback: failed to transfer mt: action id: {}: {:?}",
+                    action_id, e
+                );
+                env::log_str(&msg);
+            }
+        };
+    }
+
+    #[payable]
+    pub fn validate_transfer_mt(&mut self, data: TransferMtData, sig_data: Vec<u8>) -> Promise {
+        require!(
+            env::prepaid_gas() >= GAS_FOR_VALIDATE_TRANSFER,
+            "Not enough gas"
+        );
+        require!(!self.paused, "paused");
+
+        self.require_sig(
+            data.action_id.into(),
+            data.try_to_vec().unwrap(),
+            sig_data,
+            b"ValidateTransferMt",
+        );
+
+        xpnft_erc1155::ext(data.mint_with)
+            .with_attached_deposit(env::attached_deposit())
+            .with_static_gas(Gas(TGAS * 10))
+            .mt_mint(data.owner_id, data.token_metadatas, data.supply)
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 10))
+                    .validate_transfer_callback_mt(data.action_id.0),
+            )
+    }
+
+    // This is the callback function when the promise in the validate_unfreeze_nft
+    /// function is completed. It will check if the promise result was
+    /// successful or not.
+    #[private]
+    pub fn validate_transfer_callback_mt(
+        &mut self,
+        action_id: u128,
+        #[callback_result] call_result: Result<MultiToken, PromiseError>,
+    ) {
+        let _res = match call_result {
+            Ok(_) => {
+                // Do Nothing
+            }
+            Err(e) => {
+                self.consumed_actions.remove(&action_id);
+                env::log_str(&format!(
+                    "validate transfer callback: failed to mint mt: actionid: {} : {:?}",
+                    action_id, e
+                ))
+            }
+        };
     }
 
     #[private]

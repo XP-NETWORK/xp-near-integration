@@ -12,5 +12,5 @@ members = [
     "xpbridge",
     "currency-data-oracle",
     "xpnft-royalty",
-    "xpnft-erc1155",
+    "xpnft-erc1155"
 ]

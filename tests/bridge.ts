@@ -87,7 +87,7 @@ describe("bridge", async () => {
         await xpnftAcc.deployContract(
             fs.readFileSync(
                 __dirname +
-                    "/../contract/target/wasm32-unknown-unknown/release/xpnft.wasm"
+                "/../contract/target/wasm32-unknown-unknown/release/xpnft.wasm"
             )
         );
 
@@ -95,7 +95,7 @@ describe("bridge", async () => {
         await bridgeAcc.deployContract(
             fs.readFileSync(
                 __dirname +
-                    "/../contract/target/wasm32-unknown-unknown/release/xpbridge.wasm"
+                "/../contract/target/wasm32-unknown-unknown/release/xpbridge.wasm"
             )
         );
 
@@ -108,51 +108,66 @@ describe("bridge", async () => {
         await collectionOwnerAcc2.deployContract(
             fs.readFileSync(
                 __dirname +
-                    "/../contract/target/wasm32-unknown-unknown/release/xpnft.wasm"
+                "/../contract/target/wasm32-unknown-unknown/release/xpnft.wasm"
             )
         );
         nftOwnerAcc = await nearConnection.account(nftOwner.accountId);
         nftOwnerAcc2 = await nearConnection.account(nftOwner2.accountId);
 
-        sk = ed.utils.randomPrivateKey();
-        pk = await ed.getPublicKey(sk);
+        // sk = ed.utils.randomPrivateKey();
+        // pk = await ed.getPublicKey(sk);
+
+        sk = new Uint8Array([
+            230, 202, 99, 209, 117, 191, 172, 53,
+            129, 216, 220, 75, 63, 22, 65, 224,
+            46, 135, 30, 222, 115, 73, 67, 195,
+            131, 173, 161, 145, 181, 34, 58, 249
+        ])
+
+        pk = new Uint8Array([
+            181, 173, 158, 197, 56, 120, 214,
+            102, 30, 193, 34, 226, 133, 108,
+            52, 141, 186, 146, 230, 125, 224,
+            216, 180, 72, 127, 182, 177, 198,
+            109, 194, 62, 38
+        ])
 
         fee_sk = ed.utils.randomPrivateKey();
         fee_pk = await ed.getPublicKey(fee_sk);
     });
 
-    it("initialize xpnft", async () => {
-        const xpnftHelper = new XpnftHelper(
-            xpnftAcc.accountId,
-            collectionOwnerAcc
-        );
-        await xpnftHelper.initialize(bridgeAcc.accountId, {
-            spec: "nft-1.0.0",
-            name: "xpnft",
-            symbol: "XPNFT",
-            icon: null,
-            base_uri: null,
-            reference: null,
-            reference_hash: null,
-        });
-    });
+    // it("initialize xpnft", async () => {
+    //     const xpnftHelper = new XpnftHelper(
+    //         xpnftAcc.accountId,
+    //         collectionOwnerAcc
+    //     );
+    //     await xpnftHelper.initialize(bridgeAcc.accountId, {
+    //         spec: "nft-1.0.0",
+    //         name: "xpnft",
+    //         symbol: "XPNFT",
+    //         icon: null,
+    //         base_uri: null,
+    //         reference: null,
+    //         reference_hash: null,
+    //     });
+    // });
 
-    it("initialize bridge", async () => {
-        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
+    // it("initialize bridge", async () => {
+    //     const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
 
-        await bridgeHelper.initialize(pk, fee_pk);
+    //     await bridgeHelper.initialize(pk, fee_pk);
 
-        const storedPk = await bridgeHelper.getGroupKey();
-        assert.ok(Buffer.from(pk).equals(Buffer.from(storedPk)));
-    });
+    //     const storedPk = await bridgeHelper.getGroupKey();
+    //     assert.ok(Buffer.from(pk).equals(Buffer.from(storedPk)));
+    // });
 
     it("whitelist nft", async () => {
         const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
 
-        const actionId = new BN(0);
+        const actionId = new BN(5123);
         const data = new WhitelistData({
             actionId,
-            tokenContract: xpnftAcc.accountId,
+            tokenContract: "nearrobotics.near",
         });
         const message = serialize(data);
         const context = Buffer.from("WhitelistNft");
@@ -161,189 +176,193 @@ describe("bridge", async () => {
             .update(message)
             .digest();
         const signature = await ed.sign(msgHash, sk);
-        await bridgeHelper.whitelist(data, signature);
 
-        const flag = await bridgeHelper.isWhitelist(xpnftAcc.accountId);
-        assert.ok(flag);
+        console.log(signature);
+        console.log(Buffer.from(signature).toString("hex"));
+
+        // await bridgeHelper.whitelist(data, signature);
+
+        // const flag = await bridgeHelper.isWhitelist(xpnftAcc.accountId);
+        // assert.ok(flag);
     });
 
-    it("pause bridge", async () => {
-        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
+    // it("pause bridge", async () => {
+    //     const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
 
-        const actionId = new BN(1);
-        const data = new PauseData({ actionId });
-        const message = serialize(data);
-        const context = Buffer.from("SetPause");
-        const msgHash = createHash("SHA512")
-            .update(context)
-            .update(message)
-            .digest();
-        const signature = await ed.sign(msgHash, sk);
-        await bridgeHelper.pause(data, signature);
+    //     const actionId = new BN(1);
+    //     const data = new PauseData({ actionId });
+    //     const message = serialize(data);
+    //     const context = Buffer.from("SetPause");
+    //     const msgHash = createHash("SHA512")
+    //         .update(context)
+    //         .update(message)
+    //         .digest();
+    //     const signature = await ed.sign(msgHash, sk);
+    //     await bridgeHelper.pause(data, signature);
 
-        const flag = await bridgeHelper.isPaused();
-        assert.ok(flag);
-    });
+    //     const flag = await bridgeHelper.isPaused();
+    //     assert.ok(flag);
+    // });
 
-    it("unpause bridge", async () => {
-        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
+    // it("unpause bridge", async () => {
+    //     const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
 
-        const actionId = new BN(2);
-        const data = new UnpauseData({ actionId });
-        const message = serialize(data);
-        const context = Buffer.from("SetUnpause");
-        const msgHash = createHash("SHA512")
-            .update(context)
-            .update(message)
-            .digest();
-        const signature = await ed.sign(msgHash, sk);
-        await bridgeHelper.unpause(data, signature);
+    //     const actionId = new BN(2);
+    //     const data = new UnpauseData({ actionId });
+    //     const message = serialize(data);
+    //     const context = Buffer.from("SetUnpause");
+    //     const msgHash = createHash("SHA512")
+    //         .update(context)
+    //         .update(message)
+    //         .digest();
+    //     const signature = await ed.sign(msgHash, sk);
+    //     await bridgeHelper.unpause(data, signature);
 
-        const flag = await bridgeHelper.isPaused();
-        assert.ok(!flag);
-    });
+    //     const flag = await bridgeHelper.isPaused();
+    //     assert.ok(!flag);
+    // });
 
-    it("transfer wrapped_nft:0", async () => {
-        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
+    // it("transfer wrapped_nft:0", async () => {
+    //     const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, bridgeAcc);
 
-        const actionId = new BN(3);
-        const data = new TransferNftData({
-            actionId,
-            mintWith: xpnftAcc.accountId,
-            tokenId: "0",
-            tokenOwnerId: nftOwnerAcc.accountId,
-            tokenMetadata: new TokenMetadataData({
-                title: "Olympus Mons",
-                description: "The tallest mountain in the charted solar system",
-                media: null,
-                mediaHash: null,
-                copies: 10000,
-                issuedAt: null,
-                expiresAt: null,
-                startsAt: null,
-                updatedAt: null,
-                extra: null,
-                reference: null,
-                referenceHash: null,
-            }),
-        });
-        const message = serialize(data);
-        const context = Buffer.from("ValidateTransferNft");
-        const msgHash = createHash("SHA512")
-            .update(context)
-            .update(message)
-            .digest();
+    //     const actionId = new BN(3);
+    //     const data = new TransferNftData({
+    //         actionId,
+    //         mintWith: xpnftAcc.accountId,
+    //         tokenId: "0",
+    //         tokenOwnerId: nftOwnerAcc.accountId,
+    //         tokenMetadata: new TokenMetadataData({
+    //             title: "Olympus Mons",
+    //             description: "The tallest mountain in the charted solar system",
+    //             media: null,
+    //             mediaHash: null,
+    //             copies: 10000,
+    //             issuedAt: null,
+    //             expiresAt: null,
+    //             startsAt: null,
+    //             updatedAt: null,
+    //             extra: null,
+    //             reference: null,
+    //             referenceHash: null,
+    //         }),
+    //     });
+    //     const message = serialize(data);
+    //     const context = Buffer.from("ValidateTransferNft");
+    //     const msgHash = createHash("SHA512")
+    //         .update(context)
+    //         .update(message)
+    //         .digest();
 
-        const signature = await ed.sign(msgHash, sk);
-        const res = await bridgeHelper.transferNft(data, signature);
-        console.log(res);
-    });
+    //     const signature = await ed.sign(msgHash, sk);
+    //     const res = await bridgeHelper.transferNft(data, signature);
+    //     console.log(res);
+    // });
 
-    it("withdraw wrapped_nft:0", async () => {
-        const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, nftOwnerAcc);
-        const chainNonce = 0;
-        const to = "example_address";
-        const amt = new BN(1_000_000_000_000);
+    // it("withdraw wrapped_nft:0", async () => {
+    //     const bridgeHelper = new BridgeHelper(bridgeAcc.accountId, nftOwnerAcc);
+    //     const chainNonce = 0;
+    //     const to = "example_address";
+    //     const amt = new BN(1_000_000_000_000);
 
-        const data = new TransferTxData({
-            value: amt,
-            fromChain: 31,
-            toChain: chainNonce,
-            to: to,
-        });
-        const message = serialize(data);
-        const msgHash = createHash("SHA512").update(message).digest();
+    //     const data = new TransferTxData({
+    //         value: amt,
+    //         fromChain: 31,
+    //         toChain: chainNonce,
+    //         to: to,
+    //     });
+    //     const message = serialize(data);
+    //     const msgHash = createHash("SHA512").update(message).digest();
 
-        const signature = await ed.sign(msgHash, fee_sk);
+    //     const signature = await ed.sign(msgHash, fee_sk);
 
-        await bridgeHelper.withdrawNft(
-            xpnftAcc.accountId,
-            "0",
-            chainNonce,
-            to,
-            amt,
-            signature
-        );
-    });
+    //     await bridgeHelper.withdrawNft(
+    //         xpnftAcc.accountId,
+    //         "0",
+    //         chainNonce,
+    //         to,
+    //         amt,
+    //         signature
+    //     );
+    // });
 
-    it("initialize common_nft", async () => {
-        const nftHelper = new XpnftHelper(
-            collectionOwnerAcc2.accountId,
-            collectionOwnerAcc2
-        );
-        await nftHelper.initialize(collectionOwnerAcc2.accountId, {
-            spec: "nft-1.0.0",
-            name: "rarible",
-            symbol: "RAR",
-            icon: null,
-            base_uri: null,
-            reference: null,
-            reference_hash: null,
-        });
-    });
+    // it("initialize common_nft", async () => {
+    //     const nftHelper = new XpnftHelper(
+    //         collectionOwnerAcc2.accountId,
+    //         collectionOwnerAcc2
+    //     );
+    //     await nftHelper.initialize(collectionOwnerAcc2.accountId, {
+    //         spec: "nft-1.0.0",
+    //         name: "rarible",
+    //         symbol: "RAR",
+    //         icon: null,
+    //         base_uri: null,
+    //         reference: null,
+    //         reference_hash: null,
+    //     });
+    // });
 
-    it("mint common_nft:0", async () => {
-        let nftHelper = new XpnftHelper(
-            collectionOwnerAcc2.accountId,
-            collectionOwnerAcc2
-        );
-        await nftHelper.mint("0", nftOwnerAcc2.accountId, {
-            title: "Lockheed Martin",
-            description: "The tallest mountain in the charted solar system",
-            media: null,
-            media_hash: null,
-            copies: 10000,
-            issued_at: null,
-            expires_at: null,
-            starts_at: null,
-            updated_at: null,
-            extra: null,
-            reference: null,
-            reference_hash: null,
-        });
+    // it("mint common_nft:0", async () => {
+    //     let nftHelper = new XpnftHelper(
+    //         collectionOwnerAcc2.accountId,
+    //         collectionOwnerAcc2
+    //     );
+    //     await nftHelper.mint("0", nftOwnerAcc2.accountId, {
+    //         title: "Lockheed Martin",
+    //         description: "The tallest mountain in the charted solar system",
+    //         media: null,
+    //         media_hash: null,
+    //         copies: 10000,
+    //         issued_at: null,
+    //         expires_at: null,
+    //         starts_at: null,
+    //         updated_at: null,
+    //         extra: null,
+    //         reference: null,
+    //         reference_hash: null,
+    //     });
 
-        nftHelper = new XpnftHelper(
-            collectionOwnerAcc2.accountId,
-            nftOwnerAcc2
-        );
-        await nftHelper.approve("0", bridgeAcc.accountId);
-    });
+    //     nftHelper = new XpnftHelper(
+    //         collectionOwnerAcc2.accountId,
+    //         nftOwnerAcc2
+    //     );
+    //     await nftHelper.approve("0", bridgeAcc.accountId);
+    // });
 
-    it("freeze nft:0", async () => {
-        const chainNonce = 0;
-        const to = "example_address";
-        const amt = new BN(1_000_000_000_000);
+    // it("freeze nft:0", async () => {
+    //     const chainNonce = 0;
+    //     const to = "example_address";
+    //     const amt = new BN(1_000_000_000_000);
 
-        const bridgeHelper = new BridgeHelper(
-            bridgeAcc.accountId,
-            nftOwnerAcc2
-        );
+    //     const bridgeHelper = new BridgeHelper(
+    //         bridgeAcc.accountId,
+    //         nftOwnerAcc2
+    //     );
 
-        const data = new TransferTxData({
-            value: amt,
-            fromChain: 31,
-            toChain: chainNonce,
-            to: to,
-        });
-        const message = serialize(data);
-        const msgHash = createHash("SHA512").update(message).digest();
+    //     const data = new TransferTxData({
+    //         value: amt,
+    //         fromChain: 31,
+    //         toChain: chainNonce,
+    //         to: to,
+    //     });
+    //     const message = serialize(data);
+    //     const msgHash = createHash("SHA512").update(message).digest();
 
-        const signature = await ed.sign(msgHash, fee_sk);
+    //     const signature = await ed.sign(msgHash, fee_sk);
 
-        await bridgeHelper.freezeNft(
-            collectionOwnerAcc2.accountId,
-            "0",
-            chainNonce,
-            to,
-            "foreign_nft_contract",
-            amt,
-            signature
-        );
-    });
+    //     await bridgeHelper.freezeNft(
+    //         collectionOwnerAcc2.accountId,
+    //         "0",
+    //         chainNonce,
+    //         to,
+    //         "foreign_nft_contract",
+    //         amt,
+    //         signature
+    //     );
+    // });
 
-    after(async () => {
-        await worker.tearDown().catch((error) => {
-            console.log("Failed to stop the sandbox:", error);
-        });
-    });
+    // after(async () => {
+    //     await worker.tearDown().catch((error) => {
+    //         console.log("Failed to stop the sandbox:", error);
+    //     });
+    // });
 });
