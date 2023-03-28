@@ -1360,7 +1360,7 @@ impl XpBridge {
     pub fn validate_transfer_callback_mt(
         &mut self,
         action_id: u128,
-        #[callback_result] call_result: Result<MultiToken, PromiseError>,
+        #[callback_result] call_result: Result<Vec<MultiToken>, PromiseError>,
     ) {
         let _res = match call_result {
             Ok(_) => {

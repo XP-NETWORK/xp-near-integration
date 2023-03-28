@@ -66,7 +66,7 @@ pub trait XpMt {
         token_owner_id: AccountId,
         token_metadata: Vec<TokenMetadata>,
         supply: Vec<Balance>,
-    ) -> MultiToken;
+    ) -> Vec<MultiToken>;
 
     fn mt_burn(
         &mut self,
