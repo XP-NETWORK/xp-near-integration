@@ -92,7 +92,7 @@ pub struct UnfreezeNftData {
     token_contract: AccountId,
     token_id: TokenId,
     receiver_id: AccountId,
-    token_amt: U128,
+    // token_amt: U128,
 }
 #[derive(Clone, PartialEq, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
@@ -468,7 +468,7 @@ impl XpBridge {
         chain_nonce: u8,
         to: String,
         amt: u128,
-        #[callback_result] call_result: Result<Option<Token>, PromiseError>,
+        #[callback_result] call_result: Result<Option<JsonToken>, PromiseError>,
     ) -> Promise {
         match call_result {
             Ok(_) => xpnft_royalty::ext(token_contract.clone())
@@ -500,7 +500,7 @@ impl XpBridge {
     pub fn withdraw_callback(
         &mut self,
         token_contract: AccountId,
-        token: Option<Token>,
+        token: Option<JsonToken>,
         chain_nonce: u8,
         to: String,
         amt: u128,
@@ -544,7 +544,7 @@ impl XpBridge {
         to: String,
         mint_with: String,
         sig_data: Vec<u8>,
-        token_amt: Option<u128>,
+        // token_amt: Option<u128>,
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
@@ -574,7 +574,7 @@ impl XpBridge {
                         mint_with,
                         env::attached_deposit(),
                         env::signer_account_id(),
-                        token_amt,
+                        // token_amt,
                     ),
             );
     }
@@ -589,70 +589,70 @@ impl XpBridge {
         mint_with: String,
         amt: u128,
         sender: AccountId,
-        token_amt: Option<u128>,
+        // token_amt: Option<u128>,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         match call_result {
             Ok(_) => {
-                if token_amt > Some(0) {
-                    common_mt::ext(token_contract.clone())
-                        .with_attached_deposit(1)
-                        .with_static_gas(Gas(TGAS * 10))
-                        .mt_transfer(
-                            env::current_account_id(),
-                            token_id.clone(),
-                            match token_amt {
-                                Some(p) => p,
-                                None => 0,
-                            },
-                            None,
-                            None,
-                        )
-                        .then(
-                            Self::ext(env::current_account_id())
-                                .with_static_gas(Gas(TGAS * 8))
-                                .freeze_callback(
-                                    token_contract,
-                                    token_id,
-                                    chain_nonce,
-                                    to,
-                                    mint_with,
-                                    amt,
-                                    sender,
-                                    token_amt,
-                                ),
-                        );
-                } else {
-                    common_nft::ext(token_contract.clone())
-                        .with_attached_deposit(1)
-                        .with_static_gas(Gas(TGAS * 10))
-                        .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
-                        .then(
-                            Self::ext(env::current_account_id())
-                                .with_static_gas(Gas(TGAS * 8))
-                                .freeze_callback(
-                                    token_contract,
-                                    token_id,
-                                    chain_nonce,
-                                    to,
-                                    mint_with,
-                                    amt,
-                                    sender,
-                                    token_amt,
-                                ),
-                        );
-                }
+                // if token_amt > Some(0) {
+                //     common_mt::ext(token_contract.clone())
+                //         .with_attached_deposit(1)
+                //         .with_static_gas(Gas(TGAS * 10))
+                //         .mt_transfer(
+                //             env::current_account_id(),
+                //             token_id.clone(),
+                //             match token_amt {
+                //                 Some(p) => p,
+                //                 None => 0,
+                //             },
+                //             None,
+                //             None,
+                //         )
+                //         .then(
+                //             Self::ext(env::current_account_id())
+                //                 .with_static_gas(Gas(TGAS * 8))
+                //                 .freeze_callback(
+                //                     token_contract,
+                //                     token_id,
+                //                     chain_nonce,
+                //                     to,
+                //                     mint_with,
+                //                     amt,
+                //                     sender,
+                //                     token_amt,
+                //                 ),
+                //         );
+                // } else {
+                common_nft::ext(token_contract.clone())
+                    .with_attached_deposit(1)
+                    .with_static_gas(Gas(TGAS * 10))
+                    .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(Gas(TGAS * 8))
+                            .freeze_callback(
+                                token_contract,
+                                token_id,
+                                chain_nonce,
+                                to,
+                                mint_with,
+                                amt,
+                                sender,
+                                // token_amt,
+                            ),
+                    );
+                // }
             }
             Err(e) => {
                 Promise::new(sender).transfer(amt);
                 let msg;
-                if token_amt > Some(0) {
-                    msg = format!("freeze callback: failed to transfer mt: failed to verify tx fee :actionid: {} : {:?}",
+                // if token_amt > Some(0) {
+                //     msg = format!("freeze callback: failed to transfer mt: failed to verify tx fee :actionid: {} : {:?}",
+                //     self.action_cnt, e);
+                // } else {
+                msg = format!("freeze callback: failed to transfer nft: failed to verify tx fee :actionid: {} : {:?}",
                     self.action_cnt, e);
-                } else {
-                    msg = format!("freeze callback: failed to transfer nft: failed to verify tx fee :actionid: {} : {:?}",
-                    self.action_cnt, e)
-                }
+                // }
                 env::log_str(&msg)
             }
         }
@@ -672,7 +672,7 @@ impl XpBridge {
         mint_with: String,
         amt: u128,
         sender: AccountId,
-        token_amt: Option<u128>,
+        // token_amt: Option<u128>,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         match call_result {
@@ -688,24 +688,24 @@ impl XpBridge {
                     contract: token_contract,
                     token_id,
                     mint_with,
-                    token_amt,
+                    // token_amt,
                 }
                 .emit();
             }
             Err(e) => {
                 Promise::new(sender).transfer(amt);
                 let msg;
-                if token_amt > Some(0) {
-                    msg = format!(
-                        "freeze callback: failed to transfer mt: actionid: {} : {:?}",
-                        self.action_cnt, e
-                    );
-                } else {
-                    msg = format!(
-                        "freeze callback: failed to transfer nft: actionid: {} : {:?}",
-                        self.action_cnt, e
-                    )
-                }
+                // if token_amt > Some(0) {
+                //     msg = format!(
+                //         "freeze callback: failed to transfer mt: actionid: {} : {:?}",
+                //         self.action_cnt, e
+                //     );
+                // } else {
+                msg = format!(
+                    "freeze callback: failed to transfer nft: actionid: {} : {:?}",
+                    self.action_cnt, e
+                );
+                // }
                 env::log_str(&msg);
             }
         }
@@ -735,33 +735,33 @@ impl XpBridge {
             b"ValidateUnfreezeNft",
         );
 
-        if data.token_amt > U128(0) {
-            common_mt::ext(data.token_contract)
-                .with_attached_deposit(env::attached_deposit())
-                .with_static_gas(Gas(TGAS * 10))
-                .mt_transfer(
-                    data.receiver_id,
-                    data.token_id,
-                    data.token_amt.into(),
-                    None,
-                    None,
-                )
-                .then(
-                    Self::ext(env::current_account_id())
-                        .with_static_gas(Gas(TGAS * 10))
-                        .validate_unfreeze_callback(data.action_id.0, data.token_amt.0),
-                )
-        } else {
-            common_nft::ext(data.token_contract)
-                .with_attached_deposit(env::attached_deposit())
-                .with_static_gas(Gas(TGAS * 10))
-                .nft_transfer(data.receiver_id, data.token_id, None, None)
-                .then(
-                    Self::ext(env::current_account_id())
-                        .with_static_gas(Gas(TGAS * 10))
-                        .validate_unfreeze_callback(data.action_id.0, data.token_amt.0),
-                )
-        }
+        // if data.token_amt > U128(0) {
+        //     common_mt::ext(data.token_contract)
+        //         .with_attached_deposit(env::attached_deposit())
+        //         .with_static_gas(Gas(TGAS * 10))
+        //         .mt_transfer(
+        //             data.receiver_id,
+        //             data.token_id,
+        //             data.token_amt.into(),
+        //             None,
+        //             None,
+        //         )
+        //         .then(
+        //             Self::ext(env::current_account_id())
+        //                 .with_static_gas(Gas(TGAS * 10))
+        //                 .validate_unfreeze_callback(data.action_id.0, data.token_amt.0),
+        //         )
+        // } else {
+        common_nft::ext(data.token_contract)
+            .with_attached_deposit(env::attached_deposit())
+            .with_static_gas(Gas(TGAS * 10))
+            .nft_transfer(data.receiver_id, data.token_id, None, None)
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 10))
+                    .validate_unfreeze_callback(data.action_id.0 /* , data.token_amt.0*/),
+            )
+        // }
     }
 
     /// This is the callback function when the promise in the validate_unfreeze_nft
@@ -771,7 +771,7 @@ impl XpBridge {
     pub fn validate_unfreeze_callback(
         &mut self,
         action_id: u128,
-        token_amt: u128,
+        // token_amt: u128,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
         let _res = match call_result {
@@ -781,17 +781,17 @@ impl XpBridge {
             Err(e) => {
                 self.consumed_actions.remove(&action_id);
                 let msg;
-                if token_amt > U128(0).into() {
-                    msg = format!(
-                        "validate unfreeze callback: failed to transfer mt: action id: {}: {:?}",
-                        action_id, e
-                    );
-                } else {
-                    msg = format!(
-                        "validate unfreeze callback: failed to transfer nft: action id: {}: {:?}",
-                        action_id, e
-                    )
-                }
+                // if token_amt > U128(0).into() {
+                //     msg = format!(
+                //         "validate unfreeze callback: failed to transfer mt: action id: {}: {:?}",
+                //         action_id, e
+                //     );
+                // } else {
+                msg = format!(
+                    "validate unfreeze callback: failed to transfer nft: action id: {}: {:?}",
+                    action_id, e
+                );
+                // }
                 env::log_str(&msg);
             }
         };
@@ -846,14 +846,14 @@ impl XpBridge {
         token_id: String,
         receiver_id: AccountId,
         token_contract: AccountId,
-        token_amt: U128,
+        // token_amt: U128,
     ) -> Vec<u8> {
         let event = UnfreezeNftData {
             action_id,
             token_id,
             receiver_id,
             token_contract,
-            token_amt,
+            // token_amt,
         };
         event.try_to_vec().unwrap()
     }
@@ -946,6 +946,49 @@ impl XpBridge {
             self.whitelist.contains(&token_contract.clone().to_string()),
             "Not whitelist"
         );
+        return Self::ext(env::current_account_id())
+            .verify_paid_amount_by_sig(
+                TransferTx {
+                    value: env::attached_deposit().into(),
+                    from_chain: 31,
+                    to_chain: chain_nonce,
+                    to: to.clone(),
+                },
+                sig_data,
+            )
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(Gas(TGAS * 30))
+                    .check_enough_fees_callback_for_transfer_mt(
+                        token_contract,
+                        vec![token_id],
+                        chain_nonce,
+                        to,
+                        mint_with,
+                        env::attached_deposit(),
+                        env::signer_account_id(),
+                        vec![1],
+                    ),
+            );
+    }
+
+    #[payable]
+    pub fn freeze_mt_batch(
+        &mut self,
+        token_contract: AccountId,
+        token_ids: Vec<TokenId>,
+        chain_nonce: u8,
+        to: String,
+        mint_with: String,
+        sig_data: Vec<u8>,
+        token_amts: Vec<u128>,
+    ) -> Promise {
+        require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
+        require!(!self.paused, "paused");
+        require!(
+            self.whitelist.contains(&token_contract.clone().to_string()),
+            "Not whitelist"
+        );
 
         return Self::ext(env::current_account_id())
             .verify_paid_amount_by_sig(
@@ -960,17 +1003,109 @@ impl XpBridge {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(Gas(TGAS * 30))
-                    .check_enough_fees_callback_for_transfer(
+                    .check_enough_fees_callback_for_transfer_mt(
                         token_contract,
-                        token_id,
+                        token_ids,
                         chain_nonce,
                         to,
                         mint_with,
                         env::attached_deposit(),
                         env::signer_account_id(),
-                        Some(1),
+                        token_amts,
                     ),
             );
+    }
+
+    #[private]
+    pub fn check_enough_fees_callback_for_transfer_mt(
+        &mut self,
+        token_contract: AccountId,
+        token_ids: Vec<TokenId>,
+        chain_nonce: u8,
+        to: String,
+        mint_with: String,
+        amt: u128,
+        sender: AccountId,
+        token_amts: Vec<u128>,
+        #[callback_result] call_result: Result<(), PromiseError>,
+    ) {
+        match call_result {
+            Ok(_) => {
+                common_mt::ext(token_contract.clone())
+                    .with_attached_deposit(1)
+                    .with_static_gas(Gas(TGAS * 10))
+                    .mt_batch_transfer(
+                        env::current_account_id(),
+                        token_ids.clone(),
+                        token_amts.clone(),
+                        None,
+                        None,
+                    )
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(Gas(TGAS * 8))
+                            .freeze_callback_mt(
+                                token_contract,
+                                token_ids,
+                                chain_nonce,
+                                to,
+                                mint_with,
+                                amt,
+                                sender,
+                                token_amts,
+                            ),
+                    );
+            }
+            Err(e) => {
+                Promise::new(sender).transfer(amt);
+                let msg;
+                msg = format!("freeze callback: failed to transfer mt: failed to verify tx fee :actionid: {} : {:?}",
+                    self.action_cnt, e);
+                env::log_str(&msg)
+            }
+        }
+    }
+
+    #[private]
+    pub fn freeze_callback_mt(
+        &mut self,
+        token_contract: AccountId,
+        token_id: Vec<TokenId>,
+        chain_nonce: u8,
+        to: String,
+        mint_with: String,
+        amt: u128,
+        sender: AccountId,
+        token_amts: Vec<u128>,
+        #[callback_result] call_result: Result<(), PromiseError>,
+    ) {
+        match call_result {
+            Ok(_) => {
+                self.action_cnt += 1;
+                self.tx_fees += amt;
+
+                TransferMtEvent {
+                    action_id: self.action_cnt,
+                    chain_nonce,
+                    to,
+                    amt,
+                    contract: token_contract,
+                    token_id,
+                    mint_with,
+                    token_amts,
+                }
+                .emit();
+            }
+            Err(e) => {
+                Promise::new(sender).transfer(amt);
+                let msg;
+                msg = format!(
+                    "freeze callback: failed to transfer nft: actionid: {} : {:?}",
+                    self.action_cnt, e
+                );
+                env::log_str(&msg);
+            }
+        }
     }
 
     #[payable]

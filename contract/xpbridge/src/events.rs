@@ -6,7 +6,7 @@ use near_sdk::{
     AccountId,
 };
 
-use crate::{MultiToken, Token};
+use crate::{MultiToken, JsonToken};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
@@ -18,7 +18,7 @@ pub struct TransferNftEvent {
     pub amt: u128,
     pub token_id: TokenId,
     pub contract: AccountId,
-    pub token_amt: Option<u128>,
+    // pub token_amt: Option<u128>,
 }
 
 impl TransferNftEvent {
@@ -42,6 +42,39 @@ impl TransferNftEvent {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct TransferMtEvent {
+    pub action_id: u128,
+    pub chain_nonce: u8,
+    pub to: String,
+    pub mint_with: String,
+    pub amt: u128,
+    pub token_id: Vec<TokenId>,
+    pub contract: AccountId,
+    pub token_amts: Vec<u128>,
+}
+
+impl TransferMtEvent {
+    fn to_json_string(&self) -> String {
+        let event = Event {
+            event: self,
+            event_type: "TransferUnique",
+        };
+        // Events cannot fail to serialize so fine to panic on error
+        serde_json::to_string(&event)
+            .ok()
+            .unwrap_or_else(|| env::abort())
+    }
+
+    fn to_json_event_string(&self) -> String {
+        format!("EVENT_JSON:{}", self.to_json_string())
+    }
+
+    pub fn emit(self) {
+        env::log_str(&self.to_json_event_string());
+    }
+}
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct UnfreezeNftEvent {
@@ -49,7 +82,7 @@ pub struct UnfreezeNftEvent {
     pub to: String,
     pub action_id: u128,
     pub amt: u128,
-    pub token: Option<Token>,
+    pub token: Option<JsonToken>,
     pub contract: AccountId,
 }
 

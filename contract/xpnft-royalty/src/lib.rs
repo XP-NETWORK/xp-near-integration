@@ -75,7 +75,7 @@ impl Contract {
         user doesn't have to manually type metadata.
     */
     #[init]
-    pub fn new_default_meta(owner_id: AccountId, metadata: NFTContractMetadata) -> Self {
+    pub fn initialize(owner_id: AccountId, metadata: NFTContractMetadata) -> Self {
         //calls the other function "new: with some default metadata and the owner_id passed in 
         Self::new(
             owner_id,

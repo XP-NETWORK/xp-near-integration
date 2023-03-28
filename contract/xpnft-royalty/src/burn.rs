@@ -12,8 +12,6 @@ impl Contract {
             env::panic_str("owner is not who we expected it was")
         }
 
-        let initial_storage_usage = env::storage_usage();
-
         // A lot of moving parts here.. code reviewers.. did I get it
         // all?  Hard to believe nobody has implemented burn in the
         // standard SDK.  Googling around found me some other NFT
@@ -64,13 +62,6 @@ impl Contract {
         // Log the serialized json.
         env::log_str(&nft_burn_log.to_string());
 
-        //calculate the required storage which was the used - initial
-        let required_storage_in_bytes = env::storage_usage() - initial_storage_usage;
-
-        //refund any excess storage if the user attached too much. Panic if they didn't attach enough to cover the required.
-        refund_deposit(required_storage_in_bytes);
-
         Promise::new(env::predecessor_account_id())
-            .transfer(required_storage_in_bytes as u128 * env::storage_byte_cost())
     }
 }

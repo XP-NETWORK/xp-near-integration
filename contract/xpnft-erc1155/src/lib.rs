@@ -34,17 +34,16 @@ enum StorageKey {
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new_default_meta(owner_id: AccountId) -> Self {
-        let metadata = MtContractMetadata {
-            spec: MT_METADATA_SPEC.to_string(),
-            name: "Test".to_string(),
-            symbol: "OMG".to_string(),
-            icon: None,
-            base_uri: Some("https://staging-nft.xp.network/w".to_string()),
-            reference: None,
-            reference_hash: None,
-        };
-
+    pub fn initialize(owner_id: AccountId, metadata: MtContractMetadata) -> Self {
+        // let metadata = MtContractMetadata {
+        //     spec: MT_METADATA_SPEC.to_string(),
+        //     name: "Test".to_string(),
+        //     symbol: "OMG".to_string(),
+        //     icon: None,
+        //     base_uri: Some("https://staging-nft.xp.network/w".to_string()),
+        //     reference: None,
+        //     reference_hash: None,
+        // };
         Self::new(owner_id, metadata)
     }
 
