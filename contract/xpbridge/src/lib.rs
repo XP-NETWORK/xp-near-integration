@@ -113,13 +113,12 @@ pub struct XpBridge {
     group_key: [u8; 32],
     fee_pk: [u8; 32],
     action_cnt: u128,
-    whitelist: UnorderedSet<String>,
 }
 
 #[near_bindgen]
 impl XpBridge {
     /// Initializes the contract with the provided group key.
-    /// Also sets the initial action count, whitelist, and
+    /// Also sets the initial action count, and
     /// other contract state variables.
     #[init]
     pub fn initialize(group_key: [u8; 32], fee_pk: [u8; 32]) -> Self {
@@ -135,7 +134,6 @@ impl XpBridge {
             tx_fees: 0,
             group_key,
             action_cnt: 0,
-            whitelist: UnorderedSet::new(b"w"),
         }
     }
 
@@ -270,31 +268,6 @@ impl XpBridge {
 
         self.fee_pk = data.group_key;
     }
-    /// Updates the whitelist for the contract.
-    /// Adds the provided account_id to the whitelist
-    /// so that they can be freezed for transfers to work
-    /// in the bridge
-    /// FAILS: If contract is paused.
-    /// REQUIRED: Signature verification.
-    pub fn validate_whitelist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
-        require!(!self.paused, "paused");
-
-        require!(
-            !self.whitelist.contains(&data.token_contract.to_string()),
-            "Already whitelist"
-        );
-
-        self.require_sig(
-            data.action_id.into(),
-            data.try_to_vec().unwrap(),
-            sig_data,
-            b"WhitelistNft",
-        );
-
-        self.whitelist.insert(&data.token_contract);
-    }
-    /// Updates the whitelist for the contract.
-    /// Removes the provided account_id from the whitelist
     /// so that they cannot be freezed for transfers to work
     /// in the bridge
     /// FAILS: If contract is paused AND if the contract is not present in whitelist.
@@ -302,19 +275,12 @@ impl XpBridge {
     pub fn validate_blacklist(&mut self, data: WhitelistData, sig_data: Vec<u8>) {
         require!(!self.paused, "paused");
 
-        require!(
-            self.whitelist.contains(&data.token_contract.to_string()),
-            "Not whitelist"
-        );
-
         self.require_sig(
             data.action_id.into(),
             data.try_to_vec().unwrap(),
             sig_data,
             b"ValidateBlacklistNft",
         );
-
-        self.whitelist.remove(&data.token_contract);
     }
 
     /// Validates the transfer of NFT from the bridge to the destination chain.
@@ -548,10 +514,6 @@ impl XpBridge {
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
-        require!(
-            self.whitelist.contains(&token_contract.clone().to_string()),
-            "Not whitelist"
-        );
 
         return Self::ext(env::current_account_id())
             .verify_paid_amount_by_sig(
@@ -721,12 +683,6 @@ impl XpBridge {
             "Not enough gas"
         );
         require!(!self.paused, "paused");
-
-        require!(
-            self.whitelist
-                .contains(&data.token_contract.clone().to_string()),
-            "Not whitelist"
-        );
 
         self.require_sig(
             data.action_id.into(),
@@ -913,11 +869,8 @@ impl XpBridge {
         self.group_key
     }
 
-    /// Checks if the contract provided in `contract_id` is whitelisted
-    /// or not.
-    /// Returns boolean
-    pub fn is_whitelist(&self, contract_id: String) -> bool {
-        self.whitelist.contains(&contract_id)
+    pub fn get_fee_key(&self) -> [u8; 32] {
+        self.fee_pk
     }
 
     /// Checks if the contract is paused or not.
@@ -942,10 +895,6 @@ impl XpBridge {
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
-        require!(
-            self.whitelist.contains(&token_contract.clone().to_string()),
-            "Not whitelist"
-        );
         return Self::ext(env::current_account_id())
             .verify_paid_amount_by_sig(
                 TransferTx {
@@ -985,10 +934,6 @@ impl XpBridge {
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
-        require!(
-            self.whitelist.contains(&token_contract.clone().to_string()),
-            "Not whitelist"
-        );
 
         return Self::ext(env::current_account_id())
             .verify_paid_amount_by_sig(
@@ -1272,12 +1217,6 @@ impl XpBridge {
             "Not enough gas"
         );
         require!(!self.paused, "paused");
-
-        require!(
-            self.whitelist
-                .contains(&data.token_contract.clone().to_string()),
-            "Not whitelist"
-        );
 
         self.require_sig(
             data.action_id.into(),
