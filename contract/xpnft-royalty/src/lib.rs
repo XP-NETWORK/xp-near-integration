@@ -49,8 +49,8 @@ pub struct Contract {
     //keeps track of the metadata for the contract
     pub metadata: LazyOption<NFTContractMetadata>,
 
-     // always required
-     pub owner_by_id: TreeMap<TokenId, AccountId>,
+    // always required
+    pub owner_by_id: TreeMap<TokenId, AccountId>,
 }
 
 /// Helper structure for keys of the persistent collections.
