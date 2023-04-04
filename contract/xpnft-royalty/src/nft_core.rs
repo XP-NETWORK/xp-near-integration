@@ -92,6 +92,8 @@ impl NonFungibleTokenCore for Contract {
             memo,
         );
 
+        self.owner_by_id.insert(&token_id, &receiver_id);
+
         //we refund the owner for releasing the storage used up by the approved account IDs
         refund_approved_account_ids(
             previous_token.owner_id.clone(),
