@@ -113,6 +113,7 @@ pub struct XpBridge {
     group_key: [u8; 32],
     fee_pk: [u8; 32],
     action_cnt: u128,
+    whitelist: UnorderedSet<String>,
 }
 
 #[near_bindgen]
@@ -134,6 +135,7 @@ impl XpBridge {
             tx_fees: 0,
             group_key,
             action_cnt: 0,
+            whitelist: UnorderedSet::new(b"w"),
         }
     }
 
