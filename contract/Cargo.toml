@@ -11,5 +11,6 @@ members = [
     "xpnft",
     "xpbridge",
     "currency-data-oracle",
-    "xpnft-royalty"
+    "xpnft-royalty",
+    "collection-creator"
 ]
