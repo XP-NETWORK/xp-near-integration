@@ -94,7 +94,7 @@ impl CollectionCreator {
             Ok(_) => {
                 CollectionCreated {
                     admin: params.owner_id.clone(),
-                    mint_with: params.account_id,
+                    mint_with: params.account_id.clone(),
                     name: params.name,
                     symbol: params.symbol,
                     bridge: params.bridge,
@@ -104,7 +104,7 @@ impl CollectionCreator {
                 }
                 .emit();
                 self.collections
-                    .insert(&params.collection_identifier, &params.owner_id);
+                    .insert(&params.collection_identifier, &params.account_id);
             }
 
             Err(e) => env::panic_str(&format!("Failed to Deploy and Init: {:?}", e)),
