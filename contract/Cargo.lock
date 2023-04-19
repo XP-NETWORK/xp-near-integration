@@ -260,6 +260,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "collection-creator"
+version = "0.1.0"
+dependencies = [
+ "near-contract-standards 4.1.1",
+ "near-sdk 4.1.1",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
