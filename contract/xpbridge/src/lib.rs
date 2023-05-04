@@ -512,7 +512,7 @@ impl XpBridge {
         to: String,
         mint_with: String,
         sig_data: Vec<u8>,
-        // token_amt: Option<u128>,
+        approval_id: Option<u64>, // token_amt: Option<u128>,
     ) -> Promise {
         require!(env::prepaid_gas() >= GAS_FOR_FREEZE_NFT, "Not enough gas");
         require!(!self.paused, "paused");
@@ -538,7 +538,7 @@ impl XpBridge {
                         mint_with,
                         env::attached_deposit(),
                         env::signer_account_id(),
-                        // token_amt,
+                        approval_id, // token_amt,
                     ),
             );
     }
@@ -553,6 +553,7 @@ impl XpBridge {
         mint_with: String,
         amt: u128,
         sender: AccountId,
+        approval_id: Option<u64>,
         // token_amt: Option<u128>,
         #[callback_result] call_result: Result<(), PromiseError>,
     ) {
@@ -590,7 +591,12 @@ impl XpBridge {
                 common_nft::ext(token_contract.clone())
                     .with_attached_deposit(1)
                     .with_static_gas(Gas(TGAS * 10))
-                    .nft_transfer(env::current_account_id(), token_id.clone(), None, None)
+                    .nft_transfer(
+                        env::current_account_id(),
+                        token_id.clone(),
+                        approval_id,
+                        None,
+                    )
                     .then(
                         Self::ext(env::current_account_id())
                             .with_static_gas(Gas(TGAS * 8))
