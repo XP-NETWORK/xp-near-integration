@@ -69,6 +69,17 @@ pub enum StorageKey {
 
 #[near_bindgen]
 impl Contract {
+
+    pub fn clean(keys: Vec<Base64VecU8>) {
+        assert!(
+            env::current_account_id() == env::predecessor_account_id(),
+            "Unauthorized"
+        );
+        for key in keys.iter() {
+            env::storage_remove(&key.0);
+        }
+    }   
+
     /*
         initialization function (can only be called once).
         this initializes the contract with default metadata so the

@@ -1,7 +1,5 @@
 use near_contract_standards::multi_token::events::MtBurn;
-use near_contract_standards::multi_token::metadata::{
-    MultiTokenMetadataProvider, MT_METADATA_SPEC,
-};
+use near_contract_standards::multi_token::metadata::MultiTokenMetadataProvider;
 use near_contract_standards::multi_token::token::{Token, TokenId};
 use near_contract_standards::multi_token::{
     core::MultiToken,
