@@ -108,3 +108,25 @@ near call price_oracle.near initialize '{"group_key":[!!!replace!!!],"decimals":
 ```
 
 near call prodfeeoracle.near initialize '{"group_key":[131,46,140,108,139,172,103,138,155,165,160,127,192,177,121,119,250,225,34,87,254,239,48,155,32,190,44,170,15,37,187,12],"decimals":{},"price_data":{},"chain_tx_fee_data":{},"other_fees":{}}' --accountId prodfeeoracle.near
+
+
+### Cleaning a contract's code
+
+1. Polulate with the contract's private key:
+
+```ts title="./scripts/scripts/view_state_keys.js"
+// private key of your account
+const PRIVATE_KEY = "<contract-private-key-here>";
+```
+
+2. Populate with the contract's account
+
+```ts title="./scripts/scripts/view_state_keys.js"
+// adds the keyPair you created to keyStore
+await myKeyStore.setKey("mainnet", "<contract-account>.near", keyPair);
+```
+
+```shell
+near --accountId <contract-account>.near call <contract-account>.near clean --base64 "$(node ./scripts/view_state_keys.js | base64)" --gas 3
+00000000000000
+```

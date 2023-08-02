@@ -9,7 +9,7 @@ async function main() {
     // creates a public / private key pair using the provided private key
     const keyPair = KeyPair.fromString(PRIVATE_KEY);
     // adds the keyPair you created to keyStore
-    await myKeyStore.setKey("mainnet", "xpnft-royalty.near", keyPair);
+    await myKeyStore.setKey("mainnet", "", keyPair);
 
     const config = {
         myKeyStore,
